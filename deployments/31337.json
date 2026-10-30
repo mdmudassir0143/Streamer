@@ -1,0 +1,19 @@
+{
+  "chainId": 31337,
+  "decimals": {
+    "USDT": 6,
+    "WBTC": 8,
+    "WETH": 18,
+    "WHSK": 18
+  },
+  "deployer": "0x1e4dd57bAcB144B1fA42D43513750665F2D62e53",
+  "startBlock": 0,
+  "tokens": {
+    "USDT": "0x610070Ee46461FEd78FD4be520D894Ef07866a56",
+    "WBTC": "0x7c0c7A59468d1f86b50da8944bdcA00174b49e60",
+    "WETH": "0x51f10B56585d45396ff277280B47640B2247E5a8",
+    "WHSK": "0xfFd234D2f61A41711b025f7e00cAaa1E354433eF"
+  },
+  "vault": "0xe9F69870DC2299f3Da98Abe4ecD00505fF1BA40d",
+  "venue": "0x9188f021E4FbBd00c018D7C1EEC1120eC91b0Ed5"
+}
