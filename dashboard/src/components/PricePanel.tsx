@@ -1,6 +1,7 @@
 'use client';
 import { usePrices } from '@/lib/agentApi';
 import { timeAgo } from '@/lib/format';
+import { Num } from './ui';
 
 const fmt = (n?: number) => (n == null ? '—' : n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 0 }) : n.toLocaleString('en-US', { maximumFractionDigits: 4 }));
 
@@ -16,8 +17,8 @@ export function PricePanel() {
         const gap = c && v ? ((v - c) / c) * 10000 : null;
         return (
           <div className="price-row" key={k}>
-            <span>{k}</span><span className="mono">${fmt(c)}</span><span className="mono">${fmt(v)}</span>
-            <span className={`mono ${gap != null && Math.abs(gap) > 50 ? 'warn' : 'faint'}`}>{gap == null ? '—' : `${gap.toFixed(0)} bps`}</span>
+            <span>{k}</span><span className="num">$<Num>{fmt(c)}</Num></span><span className="num">$<Num>{fmt(v)}</Num></span>
+            <span className={`num ${gap != null && Math.abs(gap) > 50 ? "strong" : "faint"}`}>{gap == null ? '—' : `${gap.toFixed(0)} bps`}</span>
           </div>
         );
       })}

@@ -1,59 +1,85 @@
 'use client';
 import type { Meter } from '@/lib/stream';
 import { fmtTick, fmtUsdt, ratePerHour } from '@/lib/format';
+import { Num } from './ui';
 
+type Variant = 'hero' | 'panel' | 'thin';
 interface Props {
   meter: Meter;
   ratePerSec: bigint;
   flowing: boolean;
-  compact?: boolean;
+  variant?: Variant;
   label?: string;
 }
 
-/** Wallet (neutral) → exposed (accent) → returned (soft neutral), ticking every second. */
-export function StreamMeter({ meter, ratePerSec, flowing, compact, label = 'Worst-case loss right now' }: Props) {
+/** The flow pipe: in your wallet → agent can trade (liquid) → back to you. Ticks every second. */
+export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', label = 'Worst-case loss right now' }: Props) {
   const { unstreamed, exposed, returned, openEnded } = meter;
   const total = unstreamed + exposed + returned;
   const share = (v: bigint) => (total === 0n ? 0 : Number((v * 100000n) / total) / 1000);
   const grow = (v: bigint) => (v === 0n ? 0 : Math.max(share(v), 1.5));
+  const walletVal = openEnded && unstreamed === 0n ? 'Open' : fmtUsdt(unstreamed);
+
+  const segs = [
+    { k: 'wallet', name: 'In your wallet', val: walletVal, v: unstreamed, note: openEnded ? 'Bounded by your allowance' : 'Not streamed yet' },
+    { k: 'exposed', name: 'Agent can trade', val: variant === 'thin' ? fmtUsdt(exposed) : fmtTick(exposed), v: exposed, note: `+${fmtTick(ratePerSec)} USDT each second` },
+    { k: 'back', name: 'Back to you', val: fmtUsdt(returned), v: returned, note: 'Withdrawn or cancelled' },
+  ];
+  // Label cells follow the segment proportions; empty segments keep a small share so all three labels stay.
+  const cellGrow = (v: bigint) => Math.max(grow(v), 12);
+
+  const pipe = (
+    <div className="pipe" role="img" aria-label={`${fmtUsdt(unstreamed)} USDT in your wallet, ${fmtUsdt(exposed)} USDT the agent can trade, ${fmtUsdt(returned)} USDT back to you`}>
+      {segs.map((s) => s.v > 0n && (
+        <div key={s.k} className={`pipe-seg ${s.k}${s.k === 'exposed' && !flowing ? ' still' : ''}`} style={{ flexGrow: grow(s.v) }} />
+      ))}
+    </div>
+  );
+
+  if (variant === 'thin') {
+    return (
+      <div className="pipe-wrap thin">
+        <div>
+          <div className="worst-label">{label}</div>
+          <div className="worst-figure"><Num>{fmtTick(exposed)}</Num><span className="unit">USDT</span></div>
+        </div>
+        {pipe}
+        <div className="thin-legend">
+          {segs.map((s) => (
+            <div key={s.k}>
+              <div className="pipe-name"><span className={`sw ${s.k}`} />{s.k === 'wallet' ? 'Wallet' : s.k === 'exposed' ? 'Exposed' : 'Back'}</div>
+              <div className="pipe-val"><Num>{s.k === 'exposed' ? fmtUsdt(exposed) : s.val}</Num></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`meter${compact ? ' compact' : ''}`}>
-      <div className="meter-head">
+    <div className={`pipe-wrap ${variant}`}>
+      <div className="pipe-top">
         <div>
-          <div className="stat-label">{label}</div>
-          <div className="meter-figure">{fmtTick(exposed)}<span className="unit">USDT</span></div>
+          <div className="worst-label">{label}</div>
+          <div className="worst-figure"><Num>{fmtTick(exposed)}</Num><span className="unit">USDT</span></div>
         </div>
-        {!compact && (
-          <div className="meter-rate">
-            <div className="stat-label">{flowing ? 'Streaming' : 'Not flowing'}</div>
-            <div className="figure">{ratePerHour(ratePerSec)} <span className="muted small">USDT/h</span></div>
+        <div className="pipe-rate">
+          {flowing ? 'Streaming' : 'Not flowing'}
+          <b><Num>{ratePerHour(ratePerSec)}</Num> USDT/h</b>
+        </div>
+      </div>
+      <div className="pipe-row vals" aria-hidden>
+        {segs.map((s) => <div key={s.k} className="pipe-cell pipe-val" style={{ flexGrow: cellGrow(s.v) }}><span><Num>{s.val}</Num></span></div>)}
+      </div>
+      {pipe}
+      <div className="pipe-row">
+        {segs.map((s) => (
+          <div key={s.k} className="pipe-cell" style={{ flexGrow: cellGrow(s.v) }}>
+            <span className="pipe-name"><span className={`sw ${s.k}`} />{s.name}</span>
+            <span className="pipe-val-inline"><Num>{s.val}</Num></span>
+            {variant === 'hero' && <span className="pipe-note">{s.note}</span>}
           </div>
-        )}
-      </div>
-
-      <div className="track" role="img" aria-label={`${fmtUsdt(unstreamed)} USDT in wallet, ${fmtUsdt(exposed)} USDT exposed, ${fmtUsdt(returned)} USDT returned`}>
-        {unstreamed > 0n && <div className="seg seg-wallet" style={{ flexGrow: grow(unstreamed) }} />}
-        {exposed > 0n && <div className={`seg seg-exposed${flowing ? '' : ' still'}`} style={{ flexGrow: grow(exposed) }} />}
-        {returned > 0n && <div className="seg seg-returned" style={{ flexGrow: grow(returned) }} />}
-      </div>
-
-      <div className="legend">
-        <div className="legend-item">
-          <span className="legend-key"><span className="swatch wallet" />{compact ? 'Wallet' : 'In your wallet'}</span>
-          <span className="legend-val">{openEnded && unstreamed === 0n ? 'Open' : fmtUsdt(unstreamed)}</span>
-          {!compact && <span className="legend-note">{openEnded ? 'Open-ended, bounded by your allowance' : 'Not streamed yet'}</span>}
-        </div>
-        <div className="legend-item">
-          <span className="legend-key"><span className="swatch exposed" />{compact ? 'Exposed' : 'Agent can trade'}</span>
-          <span className="legend-val">{fmtUsdt(exposed)}</span>
-          {!compact && <span className="legend-note">+{fmtTick(ratePerSec)} USDT per second</span>}
-        </div>
-        <div className="legend-item">
-          <span className="legend-key"><span className="swatch returned" />Returned</span>
-          <span className="legend-val">{fmtUsdt(returned)}</span>
-          {!compact && <span className="legend-note">Withdrawn back to you</span>}
-        </div>
+        ))}
       </div>
     </div>
   );

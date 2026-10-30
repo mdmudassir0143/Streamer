@@ -60,7 +60,7 @@ export default function StreamDetail() {
       <div className="detail">
         <div className="stack">
           <section className="card card-pad">
-            <StreamMeter meter={meter} ratePerSec={s.ratePerSec} flowing={status === 'live'} />
+            <StreamMeter variant="panel" meter={meter} ratePerSec={s.ratePerSec} flowing={status === 'live'} />
           </section>
           <div className="stats">
             <Stat label="Exposed now" value={fmtUsdt(meter.exposed)} sub="In vault + accrued" />
@@ -73,8 +73,10 @@ export default function StreamDetail() {
           {isAgentMode && <DecisionsFeed id={raw} />}
         </div>
         <aside className="aside">
-          <KillSwitch stream={s} allowance={data.allowance} isOwner={isOwner} onDone={data.refetch} />
-          {isAgentMode && <ChatPanel streamId={raw} owner={s.owner} />}
+          <div className="aside-panel">
+            <KillSwitch stream={s} allowance={data.allowance} isOwner={isOwner} onDone={data.refetch} />
+            {isAgentMode && <ChatPanel streamId={raw} owner={s.owner} />}
+          </div>
         </aside>
       </div>
     </>

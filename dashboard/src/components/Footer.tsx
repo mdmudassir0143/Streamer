@@ -8,12 +8,12 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="container footer-inner">
-        <span>Built on HashKey Chain with HSKSwap</span>
+        <span>StreamPilot is built on HashKey Chain and trades through HSKSwap.</span>
         <span className="row">
-          <span>StreamVault on {targetChain.name}</span>
+          <span>Vault on {targetChain.name}</span>
           {v ? (link ? <a className="link mono" href={link} target="_blank" rel="noreferrer">{shortAddr(v)}</a> : <span className="mono">{shortAddr(v)}</span>) : <span>not deployed</span>}
         </span>
-        <a className="link" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+        <a className="link" href="https://github.com/mdmudassir0143/Streamer" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </footer>
   );

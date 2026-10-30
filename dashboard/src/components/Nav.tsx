@@ -12,6 +12,8 @@ import { useTx } from './useTx';
 import { useToast } from './Toast';
 import { Badge, BrandMark } from './ui';
 
+export const GITHUB = 'https://github.com/mdmudassir0143/Streamer';
+
 export function NetworkBadge() {
   const id = targetChain.id;
   const label = id === 177 ? 'HashKey Chain' : id === 133 ? 'HSK Testnet' : 'Local anvil';
@@ -105,8 +107,8 @@ export function LandingNav() {
         <Link href="/" className="brand" aria-label="StreamPilot home"><BrandMark />StreamPilot</Link>
         <nav className="nav-links" aria-label="Sections">
           <a href="#how">How it works</a>
-          <a href="#modes">Modes</a>
           <a href="#safety">Safety</a>
+          <a href={GITHUB} target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <div className="nav-right">
           <span className="nav-hide-sm"><NetworkBadge /></span>

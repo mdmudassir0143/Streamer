@@ -46,10 +46,10 @@ export function ChatPanel({ streamId, owner }: { streamId: string; owner: string
   }
 
   return (
-    <section className="card chat-card" aria-label="Agent chat">
-      <div className="card-head">
+    <section className="chat" aria-label="Agent chat">
+      <div className="chat-head">
         <h2 className="h4">Ask your agent</h2>
-        <Badge tone={online ? 'neutral' : 'warn'} dot>{online ? 'Online' : 'Offline'}</Badge>
+        {!online && <Badge tone="warn" dot>Offline</Badge>}
       </div>
       <div className="chat-log" ref={scroller} aria-live="polite">
         {log.length === 0 && (

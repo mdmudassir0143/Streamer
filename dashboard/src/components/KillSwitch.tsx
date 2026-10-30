@@ -69,27 +69,21 @@ export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: Str
 
   if (stream.cancelled) {
     return (
-      <section className="card" aria-label="Kill switch">
-        <div className="card-head"><h2 className="h4">Kill switch</h2><span className="badge">Cancelled</span></div>
-        <div className="card-body stack">
-          <p className="muted" style={{ margin: 0 }}>Everything this stream held went back to your wallet. The agent has nothing left to trade.</p>
-          {allowance !== undefined && allowance > 0n && (
-            <button className="btn btn-block" disabled={disabled} onClick={revoke}>Revoke remaining {fmtUsdt(allowance)} USDT allowance</button>
-          )}
-        </div>
+      <section className="kill" aria-label="Kill switch">
+        <div className="kill-done">Stream cancelled</div>
+        <p className="small muted" style={{ margin: 0 }}>Everything this stream held went back to your wallet. The agent has nothing left to trade.</p>
+        {allowance !== undefined && allowance > 0n && (
+          <button className="btn btn-block" disabled={disabled} onClick={revoke}>Revoke remaining {fmtUsdt(allowance)} USDT allowance</button>
+        )}
       </section>
     );
   }
 
   return (
-    <section className="card" aria-label="Kill switch">
-      <div className="card-head">
-        <h2 className="h4">Kill switch</h2>
-        {!isOwner && <span className="small faint">Owner only</span>}
-      </div>
-      <div className="card-body stack">
+    <section className="kill" aria-label="Kill switch">
+      <div className="kill-main">
         <button
-          className={`btn btn-danger btn-block hold-btn${holding ? ' holding' : ''}`}
+          className={`kill-btn${holding ? ' holding' : ''}`}
           style={{ ['--p' as string]: progress }}
           disabled={disabled}
           onPointerDown={startHold}
@@ -99,27 +93,29 @@ export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: Str
           onKeyUp={stopHold}
           aria-label="Hold to cancel the stream and withdraw everything"
         >
-          <span className="hold-fill" aria-hidden />
-          <span>{pending === 'Cancel & withdraw' ? 'Cancelling…' : holding ? 'Keep holding…' : 'Hold to cancel & withdraw all'}</span>
+          <span className="kill-btn-face">{pending === 'Cancel & withdraw' ? 'Sending…' : <>Hold to<br />kill</>}</span>
         </button>
-        <p className="small muted" style={{ margin: 0 }}>Sends every token the stream holds back to you in one transaction and stops all pulls.</p>
-        <div className="kill-grid">
-          {stream.paused || stream.halted ? (
-            <button className="btn" disabled={disabled} onClick={() => tx('Resume', 'resume', stream.halted ? 'Resumed. Drawdown breaker reset.' : 'Resumed. The stream is flowing again.')}>
-              {stream.halted ? 'Reset & resume' : 'Resume'}
-            </button>
-          ) : (
-            <button className="btn" disabled={disabled} onClick={() => tx('Pause', 'pause', 'Paused. Nothing more will stream until you resume.')}>Pause</button>
-          )}
-          <button className="btn" disabled={disabled || allowance === 0n} onClick={revoke}>
-            {allowance === 0n ? 'Allowance revoked' : 'Revoke allowance'}
+        <div className="kill-copy">
+          <h2 className="h4">Kill switch</h2>
+          <p>Hold the button to cancel. Every token the stream holds goes back to you in one transaction, and pulling stops.</p>
+          {!isOwner && <p className="strong">Connect the owner wallet to use these controls.</p>}
+        </div>
+      </div>
+      <div className="kill-grid">
+        {stream.paused || stream.halted ? (
+          <button className="btn" disabled={disabled} onClick={() => tx('Resume', 'resume', stream.halted ? 'Resumed. Drawdown breaker reset.' : 'Resumed. The stream is flowing again.')}>
+            {stream.halted ? 'Reset & resume' : 'Resume stream'}
           </button>
-        </div>
-        <div className="input-row">
-          <input className="input mono" inputMode="decimal" placeholder={`${ratePerHour(stream.ratePerSec)} USDT/h`} value={newRate} onChange={(e) => setNewRate(e.target.value)} aria-label="New rate in USDT per hour" />
-          <button className="btn" style={{ height: 40 }} disabled={disabled || !newRate.trim()} onClick={setRate}>Set rate</button>
-        </div>
-        {!isOwner && <p className="small faint" style={{ margin: 0 }}>Connect the owner wallet to use these controls.</p>}
+        ) : (
+          <button className="btn" disabled={disabled} onClick={() => tx('Pause', 'pause', 'Paused. Nothing more will stream until you resume.')}>Pause stream</button>
+        )}
+        <button className="btn" disabled={disabled || allowance === 0n} onClick={revoke}>
+          {allowance === 0n ? 'Allowance revoked' : 'Revoke allowance'}
+        </button>
+      </div>
+      <div className="input-row">
+        <input className="input" inputMode="decimal" placeholder={`${ratePerHour(stream.ratePerSec)} USDT/h`} value={newRate} onChange={(e) => setNewRate(e.target.value)} aria-label="New rate in USDT per hour" />
+        <button className="btn" style={{ height: 44 }} disabled={disabled || !newRate.trim()} onClick={setRate}>Set rate</button>
       </div>
     </section>
   );

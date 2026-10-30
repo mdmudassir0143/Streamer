@@ -5,12 +5,12 @@ import { nextIdAbi, streamVaultAbi } from '@/lib/abi';
 import { targetChain } from '@/lib/chains';
 import { deployment } from '@/lib/deployments';
 import { fmtUsdt } from '@/lib/format';
+import { Num } from './ui';
 import { owedAt, statusOf, useLocalNow, type StreamView } from '@/lib/stream';
-import { Stat } from './ui';
 
 const MAX_SCAN = 200;
 
-/** Reads protocol-wide numbers straight from the vault. Shows dashes if the RPC is unreachable. */
+/** Protocol-wide numbers read straight from the vault. Shows "Unavailable" if the RPC can't be reached. */
 export function ProtocolStats() {
   const client = usePublicClient({ chainId: targetChain.id });
   const vault = deployment.vault;
@@ -26,7 +26,7 @@ export function ProtocolStats() {
       const streams = await Promise.all(
         ids.map((id) => client!.readContract({ address: vault!, abi: streamVaultAbi, functionName: 'getStream', args: [id] }).catch(() => null)),
       );
-      return { count, streams: streams.filter(Boolean) as unknown as StreamView[], partial: count > MAX_SCAN };
+      return { count, streams: streams.filter(Boolean) as unknown as StreamView[] };
     },
   });
   const now = useLocalNow();
@@ -35,10 +35,10 @@ export function ProtocolStats() {
   const live = ok ? q.data.streams.filter((s) => statusOf(s, now) === 'live').length : 0;
   const dash = q.isError || !vault ? 'Unavailable' : '—';
   return (
-    <div className="card protocol-stats">
-      <Stat label="Streams created" value={ok ? q.data.count.toLocaleString('en-US') : dash} />
-      <Stat label="Live right now" value={ok ? live.toLocaleString('en-US') : dash} />
-      <Stat label="Total streamed" value={ok ? `${fmtUsdt(total)} USDT` : dash} sub={ok && q.data.partial ? `First ${MAX_SCAN} streams` : `On ${targetChain.name}`} />
+    <div className="figures">
+      <div><div className="figure-big">{ok ? q.data.count.toLocaleString('en-US') : dash}</div><div className="muted">Streams created</div></div>
+      <div><div className="figure-big">{ok ? live.toLocaleString('en-US') : dash}</div><div className="muted">Streaming right now</div></div>
+      <div><div className="figure-big"><Num>{ok ? fmtUsdt(total) : dash}</Num></div><div className="muted">USDT streamed so far</div></div>
     </div>
   );
 }

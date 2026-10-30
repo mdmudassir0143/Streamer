@@ -6,6 +6,7 @@ import type { Position } from '@/lib/agentApi';
 import { targetChain } from '@/lib/chains';
 import { decimalsOf, deployment, symbolOf } from '@/lib/deployments';
 import { fmtUnits, toBaseUnits } from '@/lib/format';
+import { Num } from './ui';
 
 export function Positions({ id, apiPositions }: { id: bigint; apiPositions?: Position[] }) {
   const tokens = Object.values(deployment.tokens).filter(Boolean) as Address[];
@@ -35,7 +36,7 @@ export function Positions({ id, apiPositions }: { id: bigint; apiPositions?: Pos
     <>
       <table className="table">
         <thead><tr><th>Asset</th><th className="r">Amount</th><th className="r">Value (USDT)</th></tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.sym}><td>{r.sym}</td><td className="r mono">{r.amount}</td><td className="r mono">{r.value}</td></tr>)}</tbody>
+        <tbody>{rows.map((r) => <tr key={r.sym}><td>{r.sym}</td><td className="r num"><Num>{r.amount}</Num></td><td className="r num"><Num>{r.value}</Num></td></tr>)}</tbody>
       </table>
       {!apiPositions && <p className="small faint" style={{ margin: '10px 0 0' }}>Read from the vault. Non-USDT values appear when the agent is online.</p>}
     </>

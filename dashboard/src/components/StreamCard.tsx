@@ -38,7 +38,7 @@ export function StreamCard({ id }: { id: bigint }) {
         </div>
         <StatusChip status={live.status} />
       </div>
-      <StreamMeter compact meter={live.meter} ratePerSec={s.ratePerSec} flowing={live.status === 'live'} label="Worst-case loss" />
+      <StreamMeter variant="thin" meter={live.meter} ratePerSec={s.ratePerSec} flowing={live.status === 'live'} label="Worst-case loss" />
       <div className="stream-card-stats">
         <Stat label="Rate" value={`${ratePerHour(s.ratePerSec)}/h`} />
         <Stat label="Equity" value={fmtUsdt(data.equity)} />

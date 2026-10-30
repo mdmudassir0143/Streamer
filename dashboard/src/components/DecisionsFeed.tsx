@@ -4,7 +4,7 @@ import { useDecisions, type Decision } from '@/lib/agentApi';
 import { explorerTx } from '@/lib/chains';
 import { decimalsOf, symbolOf } from '@/lib/deployments';
 import { ageShort, fmtUnits } from '@/lib/format';
-import { Badge, ExternalIcon, Tabs, type Tone } from './ui';
+import { Badge, ExternalIcon, Num, Tabs, type Tone } from './ui';
 
 type Kind = 'trade' | 'veto' | 'hold' | 'failed';
 type Filter = 'all' | 'trade' | 'veto' | 'hold';
@@ -84,7 +84,7 @@ function Detail({ g }: { g: Group }) {
           <div className="feed-views" style={{ marginTop: 6 }}>
             {a.views.map((v) => (
               <div key={v.asset} className="small">
-                <span className="mono">{v.asset}</span>
+                <span>{v.asset}</span>
                 <span>{v.view}{v.conviction ? ` ${Math.round(v.conviction * 100)}%` : ''}</span>
                 <span className="faint" style={{ overflowWrap: 'anywhere' }}>{v.rationale}</span>
               </div>
@@ -104,7 +104,7 @@ function Detail({ g }: { g: Group }) {
           </div>
         ) : null}
       </div>
-      {d.error && <div><h5>Error</h5><p className="warn">{d.error}</p></div>}
+      {d.error && <div><h5>Error</h5><p className="neg">{d.error}</p></div>}
       <div className="spread">
         <div>
           <h5>Decision hash committed on-chain</h5>
@@ -146,7 +146,7 @@ export function DecisionsFeed({ id }: { id: string }) {
     <section className="card feed-card" aria-label="Agent decisions">
       <div className="card-head">
         <h2 className="h4">Agent decisions</h2>
-        {isSuccess ? <Badge dot live>Live</Badge> : isError ? <Badge tone="warn" dot>Agent offline</Badge> : null}
+        {isSuccess ? <Badge tone="accent" dot live>Live</Badge> : isError ? <Badge tone="warn" dot>Agent offline</Badge> : null}
       </div>
       <div className="feed-tools">
         <Tabs
@@ -160,7 +160,6 @@ export function DecisionsFeed({ id }: { id: string }) {
             { id: 'hold', label: 'Holds', count: counts.hold },
           ]}
         />
-        <span className="small faint">{groups.length} rows</span>
       </div>
       <div className="feed-scroll">
         {isLoading && <p className="muted" style={{ padding: 16, margin: 0 }}>Loading decisions…</p>}
@@ -171,7 +170,8 @@ export function DecisionsFeed({ id }: { id: string }) {
         {groups.slice(0, shown).map((g) => {
           const newest = tsOf(g.items[0]);
           const oldest = tsOf(g.items[g.items.length - 1]);
-          const time = g.items.length > 1 ? `${ageShort(newest)}–${ageShort(oldest)}` : ageShort(newest);
+          const a1 = ageShort(newest), a2 = ageShort(oldest);
+          const time = g.items.length > 1 && a1 !== a2 ? `${a1}–${a2}` : a1;
           const tx = g.items[0].txHash ? explorerTx(g.items[0].txHash) : null;
           const isOpen = open === g.key;
           return (
@@ -181,7 +181,7 @@ export function DecisionsFeed({ id }: { id: string }) {
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(isOpen ? null : g.key); } }}>
                 <span className="feed-time" title={new Date(newest).toLocaleString()}>{time}</span>
                 <span>{actionBadge(g)}</span>
-                <span className="feed-pair">{g.kind === 'hold' ? '—' : pairOf(g.items[0])}</span>
+                <span className="feed-pair">{g.kind === 'hold' ? '—' : <Num>{pairOf(g.items[0])}</Num>}</span>
                 <span className="feed-reason" title={g.reason}>{g.reason}</span>
                 {tx ? (
                   <a className="icon-btn" href={tx} target="_blank" rel="noreferrer" aria-label="View transaction" onClick={(e) => e.stopPropagation()}><ExternalIcon /></a>

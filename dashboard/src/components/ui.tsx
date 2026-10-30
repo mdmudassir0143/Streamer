@@ -15,7 +15,7 @@ export function Stat({ label, value, sub, tone }: { label: ReactNode; value: Rea
   return (
     <div className="stat">
       <div className="stat-label">{label}</div>
-      <div className={`stat-value${tone ? ` ${tone}` : ''}`}>{value}</div>
+      <div className={`stat-value${tone ? ` ${tone}` : ''}`}>{typeof value === 'string' ? <Num>{value}</Num> : value}</div>
       {sub != null && <div className="stat-sub">{sub}</div>}
     </div>
   );
@@ -58,10 +58,15 @@ export function ExternalIcon() {
 
 export function BrandMark() {
   return (
-    <svg className="brand-mark" viewBox="0 0 22 22" aria-hidden>
-      <rect width="22" height="22" rx="6" fill="#161a20" stroke="#272d37" />
-      <rect x="4" y="9.5" width="14" height="3" rx="1.5" fill="#272d37" />
-      <rect x="4" y="9.5" width="8.5" height="3" rx="1.5" fill="#8b95ff" />
+    <svg className="brand-mark" viewBox="0 0 26 14" aria-hidden>
+      <rect width="26" height="14" rx="7" fill="#e9edff" />
+      <rect x="2" y="2" width="13" height="10" rx="5" fill="#2b4bff" />
     </svg>
   );
+}
+
+/** Tabular figures with tightened separators (tabular "." and "," are digit-wide in Schibsted). */
+export function Num({ children }: { children: string }) {
+  const parts = children.split(/([.,])/);
+  return <>{parts.map((p, i) => (p === '.' || p === ',' ? <span key={i} className="sep">{p}</span> : p))}</>;
 }

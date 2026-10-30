@@ -10,6 +10,7 @@ import { ASSETS, deployment, type AssetSymbol } from '@/lib/deployments';
 import { fmtTick, fmtUsdt } from '@/lib/format';
 import { MODE_AGENT, MODE_INVEST, RISK_PRESETS, type RiskPreset } from '@/lib/stream';
 import { useTx } from '@/components/useTx';
+import { StreamMeter } from '@/components/StreamMeter';
 
 type Unit = 'hour' | 'day';
 const PRESET_COPY: Record<RiskPreset, string> = {
@@ -115,140 +116,147 @@ export default function NewStream() {
   const perSec = fmtTick(ratePerSec);
   const hours = ratePerSec > 0n && maxTotalBase > 0n ? Number(maxTotalBase / ratePerSec) / 3600 : null;
 
+  const hourExposed = maxTotalBase > 0n && ratePerSec * 3600n > maxTotalBase ? maxTotalBase : ratePerSec * 3600n;
+  const ceiling = maxTotalBase > 0n ? maxTotalBase : capBase;
+  const preview = {
+    unstreamed: ceiling > hourExposed ? ceiling - hourExposed : 0n,
+    exposed: hourExposed,
+    returned: 0n,
+    streamed: hourExposed,
+    openEnded: ceiling === 0n,
+  };
+
   return (
     <>
       <div className="page-head">
         <div>
           <h1 className="page-title">Start a stream</h1>
-          <p className="muted" style={{ margin: '4px 0 0', maxWidth: '60ch' }}>Your USDT stays in your wallet. The vault pulls it a little each second, and never more than the cap you approve.</p>
+          <p className="muted" style={{ margin: '6px 0 0', maxWidth: '60ch' }}>Your USDT stays in your wallet. The vault pulls it a little each second, and never more than the cap you approve.</p>
         </div>
       </div>
       <div className="new-layout">
-        <div className="form">
-          <div className="field">
-            <span className="field-label">Mode</span>
-            <div className="option-grid">
-              <button type="button" className="option" aria-pressed={mode === MODE_AGENT} onClick={() => setMode(MODE_AGENT)}>
-                <span className="option-title">AI agent</span>
-                <span className="option-desc">An analyst and a risk officer decide trades inside the limits you set.</span>
-              </button>
-              <button type="button" className="option" aria-pressed={mode === MODE_INVEST} onClick={() => setMode(MODE_INVEST)}>
-                <span className="option-title">Invest</span>
-                <span className="option-desc">Buy one asset continuously, second by second. No model involved.</span>
-              </button>
-            </div>
-          </div>
-
-          {mode === MODE_AGENT ? (
-            <label className="field">
-              <span className="field-label">Agent address</span>
-              <input className="input mono" value={agent} onChange={(e) => setAgent(e.target.value)} placeholder="0x…" spellCheck={false} />
-              <span className="field-hint">{online ? 'Filled in from the StreamPilot agent. It can trade, never withdraw.' : agentLoading ? 'Asking the agent for its address…' : 'Agent offline. Paste the agent address to continue.'}</span>
-            </label>
-          ) : null}
-
-          <div className="field">
-            <span className="field-label">{mode === MODE_AGENT ? 'Default asset' : 'Asset to buy'}</span>
-            <div><div className="segmented" role="group">
-              {ASSETS.map((a) => (
-                <button key={a} type="button" aria-pressed={asset === a} onClick={() => setAsset(a)}>{a}</button>
-              ))}
-            </div></div>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Rate</span>
-            <div className="input-row">
-              <input className="input mono" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} aria-label="Rate in USDT" />
-              <div className="segmented" role="group">
-                <button type="button" aria-pressed={unit === 'hour'} onClick={() => setUnit('hour')}>USDT / hour</button>
-                <button type="button" aria-pressed={unit === 'day'} onClick={() => setUnit('day')}>USDT / day</button>
-              </div>
-            </div>
-            <span className="field-hint">{perSec} USDT per second ({ratePerSec.toString()} base units).</span>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Duration</span>
-            <div className="input-row">
-              <input className="input mono" inputMode="decimal" value={openEnded ? '' : duration} disabled={openEnded} onChange={(e) => setDuration(e.target.value)} aria-label="Duration" placeholder={openEnded ? 'Open-ended' : ''} />
-              <div className="segmented" role="group">
-                <button type="button" aria-pressed={!openEnded && durUnit === 'hour'} onClick={() => { setOpenEnded(false); setDurUnit('hour'); }}>Hours</button>
-                <button type="button" aria-pressed={!openEnded && durUnit === 'day'} onClick={() => { setOpenEnded(false); setDurUnit('day'); }}>Days</button>
-                <button type="button" aria-pressed={openEnded} onClick={() => setOpenEnded(true)}>Open-ended</button>
-              </div>
-            </div>
-          </div>
-
-          <label className="field">
-            <span className="field-label">Max total</span>
-            <input className="input mono" inputMode="decimal" value={maxTotal} onChange={(e) => setMaxTotal(e.target.value)} placeholder={plannedTotal > 0n ? `${fmtUsdt(plannedTotal).replace(/,/g, '')} (rate × duration)` : 'No cap'} />
-            <span className="field-hint">The vault never pulls more than this in total. Leave empty to use rate × duration.</span>
-          </label>
-
-          <div className="field">
-            <span className="field-label">Risk limits</span>
-            <span className="field-hint" style={{ marginTop: -4 }}>Enforced by the contract on every trade.</span>
-            <div className="option-grid">
-              {(Object.keys(RISK_PRESETS) as RiskPreset[]).map((k) => {
-                const r = RISK_PRESETS[k];
-                return (
-                  <button key={k} type="button" className="option" aria-pressed={preset === k} onClick={() => setPreset(k)}>
-                    <span className="option-title">{k}</span>
-                    <span className="option-desc">{PRESET_COPY[k]}</span>
-                    <span className="option-desc mono" style={{ fontSize: 12 }}>Slippage {r.maxSlippageBps / 100}%, trade ≤{r.maxTradeBps / 100}%, cooldown {r.cooldownSec / 60}m</span>
+        <div className="form card card-pad">
+          <section className="form-step">
+            <span className="form-step-n">1</span>
+            <div className="form-step-body">
+              <div className="field">
+                <h2 className="h4">Mode</h2>
+                <div className="option-grid">
+                  <button type="button" className="option" aria-pressed={mode === MODE_AGENT} onClick={() => setMode(MODE_AGENT)}>
+                    <span className="option-title">AI agent</span>
+                    <span className="option-desc">An analyst and a risk officer decide trades inside the limits you set.</span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <label className="field">
-            <span className="field-label">Allowance cap</span>
-            <input className="input mono" inputMode="decimal" value={cap} onChange={(e) => { setCapTouched(true); setCap(e.target.value); }} placeholder="USDT" />
-            <span className="field-hint">The most the vault can ever pull from your wallet. Revoke it any time to stop the stream at the source.</span>
-          </label>
-        </div>
-
-        <aside className="aside">
-          <section className="card">
-            <div className="card-head"><h2 className="h4">Exposure</h2></div>
-            <div className="card-body stack">
-              <dl className="kv">
-                <dt>Per second</dt><dd>{perSec} USDT</dd>
-                <dt>Per hour</dt><dd>{fmtUsdt(ratePerSec * 3600n)} USDT</dd>
-                <dt>Cap</dt><dd>{maxTotalBase > 0n ? `${fmtUsdt(maxTotalBase)} USDT` : 'Allowance only'}</dd>
-                <dt>Fully streamed in</dt><dd>{hours != null ? (hours >= 48 ? `${(hours / 24).toFixed(1)} days` : `${hours.toFixed(1)} hours`) : 'Open-ended'}</dd>
-                <dt>Wallet balance</dt><dd>{balance !== undefined ? `${fmtUsdt(balance)} USDT` : '—'}</dd>
-              </dl>
-              <p className="small muted" style={{ margin: 0 }}>After one hour the agent can reach at most {fmtUsdt(ratePerSec * 3600n)} USDT. The rest stays in your wallet.</p>
+                  <button type="button" className="option" aria-pressed={mode === MODE_INVEST} onClick={() => setMode(MODE_INVEST)}>
+                    <span className="option-title">Invest</span>
+                    <span className="option-desc">Buy one asset continuously, second by second. No model involved.</span>
+                  </button>
+                </div>
+              </div>
+              {mode === MODE_AGENT ? (
+                <label className="field">
+                  <span className="field-label">Agent address</span>
+                  <input className="input mono" value={agent} onChange={(e) => setAgent(e.target.value)} placeholder="0x…" spellCheck={false} />
+                  <span className="field-hint">{online ? 'Filled in from the StreamPilot agent. It can trade, never withdraw.' : agentLoading ? 'Asking the agent for its address…' : 'Agent offline. Paste the agent address to continue.'}</span>
+                </label>
+              ) : null}
+              <div className="field">
+                <span className="field-label">{mode === MODE_AGENT ? 'Default asset' : 'Asset to buy'}</span>
+                <div><div className="segmented" role="group" aria-label="Asset">
+                  {ASSETS.map((a) => (
+                    <button key={a} type="button" aria-pressed={asset === a} onClick={() => setAsset(a)}>{a}</button>
+                  ))}
+                </div></div>
+              </div>
             </div>
           </section>
 
-          <section className="card">
-            <div className="card-body stack">
+          <section className="form-step">
+            <span className="form-step-n">2</span>
+            <div className="form-step-body">
+              <h2 className="h4">Rate</h2>
+              <div className="field">
+                <span className="field-label">How fast</span>
+                <div className="input-row">
+                  <input className="input" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} aria-label="Rate in USDT" />
+                  <div className="segmented" role="group" aria-label="Rate unit">
+                    <button type="button" aria-pressed={unit === 'hour'} onClick={() => setUnit('hour')}>USDT per hour</button>
+                    <button type="button" aria-pressed={unit === 'day'} onClick={() => setUnit('day')}>USDT per day</button>
+                  </div>
+                </div>
+                <span className="field-hint">That is {perSec} USDT every second.</span>
+              </div>
+              <div className="field">
+                <span className="field-label">For how long</span>
+                <div className="input-row">
+                  <input className="input" inputMode="decimal" value={openEnded ? '' : duration} disabled={openEnded} onChange={(e) => setDuration(e.target.value)} aria-label="Duration" placeholder={openEnded ? 'Open-ended' : ''} />
+                  <div className="segmented" role="group" aria-label="Duration unit">
+                    <button type="button" aria-pressed={!openEnded && durUnit === 'hour'} onClick={() => { setOpenEnded(false); setDurUnit('hour'); }}>Hours</button>
+                    <button type="button" aria-pressed={!openEnded && durUnit === 'day'} onClick={() => { setOpenEnded(false); setDurUnit('day'); }}>Days</button>
+                    <button type="button" aria-pressed={openEnded} onClick={() => setOpenEnded(true)}>Open-ended</button>
+                  </div>
+                </div>
+              </div>
+              <label className="field">
+                <span className="field-label">Max total</span>
+                <input className="input" inputMode="decimal" value={maxTotal} onChange={(e) => setMaxTotal(e.target.value)} placeholder={plannedTotal > 0n ? `${fmtUsdt(plannedTotal).replace(/,/g, '')} (rate × duration)` : 'No cap'} />
+                <span className="field-hint">The vault never pulls more than this in total. Leave it empty to use rate × duration.</span>
+              </label>
+            </div>
+          </section>
+
+          <section className="form-step">
+            <span className="form-step-n">3</span>
+            <div className="form-step-body">
+              <div className="field">
+                <h2 className="h4">Limits</h2>
+                <span className="field-hint">The contract checks these on every trade.</span>
+              </div>
+              <div className="option-grid">
+                {(Object.keys(RISK_PRESETS) as RiskPreset[]).map((k) => {
+                  const r = RISK_PRESETS[k];
+                  return (
+                    <button key={k} type="button" className="option" aria-pressed={preset === k} onClick={() => setPreset(k)}>
+                      <span className="option-title">{k}</span>
+                      <span className="option-desc">{PRESET_COPY[k]}</span>
+                      <span className="option-desc">Slippage {r.maxSlippageBps / 100}%, trades up to {r.maxTradeBps / 100}% of equity, {r.cooldownSec / 60} min cooldown</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          <section className="form-step">
+            <span className="form-step-n">4</span>
+            <div className="form-step-body">
+              <h2 className="h4">Approve and create</h2>
+              <label className="field">
+                <span className="field-label">Allowance cap</span>
+                <input className="input" inputMode="decimal" value={cap} onChange={(e) => { setCapTouched(true); setCap(e.target.value); }} placeholder="USDT" />
+                <span className="field-hint">The most the vault can ever pull from your wallet. Revoke it any time to stop the stream at the source.</span>
+              </label>
               <ol className="steps-v">
                 <li>
-                  <span className={`step-dot${approved ? ' done' : ''}`}>{approved ? '✓' : '1'}</span>
+                  <span className={`step-dot${approved ? ' done' : ''}`}>{approved ? '✓' : 'a'}</span>
                   <div className="stack" style={{ gap: 6 }}>
-                    <span className="h4">Approve USDT</span>
+                    <span className="strong">Approve USDT</span>
                     <span className="small muted">Lets the vault pull up to {fmtUsdt(capBase)} USDT as it streams. Nothing moves yet.</span>
                     {mounted && isConnected && !approved && (
-                      <button className="btn" disabled={!!pending || capBase === 0n || !vault} onClick={approve}>
+                      <div><button className="btn" disabled={!!pending || capBase === 0n || !vault} onClick={approve}>
                         {pending === 'Approve USDT' ? 'Approving…' : `Approve ${fmtUsdt(capBase)} USDT`}
-                      </button>
+                      </button></div>
                     )}
                   </div>
                 </li>
                 <li>
-                  <span className="step-dot">2</span>
+                  <span className="step-dot">b</span>
                   <div className="stack" style={{ gap: 6 }}>
-                    <span className="h4">Create stream</span>
+                    <span className="strong">Create stream</span>
                     <span className="small muted">Starts the clock. Pause, change the rate or cancel whenever you like.</span>
                     {mounted && isConnected && (
-                      <button className="btn btn-primary" disabled={!!pending || !approved || problems.length > 0} onClick={create}>
+                      <div><button className="btn btn-primary" disabled={!!pending || !approved || problems.length > 0} onClick={create}>
                         {pending === 'Create stream' ? 'Creating…' : 'Create stream'}
-                      </button>
+                      </button></div>
                     )}
                   </div>
                 </li>
@@ -264,6 +272,19 @@ export default function NewStream() {
               )}
             </div>
           </section>
+        </div>
+
+        <aside className="aside">
+          <div className="aside-panel card-pad stack">
+            <StreamMeter variant="thin" meter={preview} ratePerSec={ratePerSec} flowing label="Worst case after one hour" />
+            <dl className="kv">
+              <dt>Per hour</dt><dd>{fmtUsdt(ratePerSec * 3600n)} USDT</dd>
+              <dt>Cap</dt><dd>{maxTotalBase > 0n ? `${fmtUsdt(maxTotalBase)} USDT` : 'Allowance only'}</dd>
+              <dt>Fully streamed in</dt><dd>{hours != null ? (hours >= 48 ? `${(hours / 24).toFixed(1)} days` : `${hours.toFixed(1)} hours`) : 'Open-ended'}</dd>
+              <dt>Wallet balance</dt><dd>{balance !== undefined ? `${fmtUsdt(balance)} USDT` : '—'}</dd>
+            </dl>
+            <p className="small muted" style={{ margin: 0 }}>The rest of your budget stays in your wallet until it streams.</p>
+          </div>
         </aside>
       </div>
     </>
