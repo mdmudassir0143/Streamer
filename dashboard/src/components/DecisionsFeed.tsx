@@ -30,7 +30,7 @@ function kindOf(d: Decision): Kind {
 function shortReason(d: Decision, kind: Kind): string {
   const raw = kind === 'veto' ? riskOf(d)?.reason || d.reason || '' : kind === 'failed' ? d.error || '' : d.reason || '';
   let s = raw.replace(/^VETO:\s*/i, '');
-  if (kind === 'hold') s = s.split(':')[0];
+  if (kind === 'hold' || kind === 'trade') s = s.split(':')[0];
   s = s.split(/[(;|]/)[0].trim();
   return s || (kind === 'hold' ? 'no edge' : '');
 }

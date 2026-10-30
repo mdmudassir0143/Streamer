@@ -21,8 +21,8 @@ export function Positions({ id, apiPositions }: { id: bigint; apiPositions?: Pos
         const dec = p.decimals ?? decimalsOf(p.symbol || p.token);
         const amt = toBaseUnits(p.amount, dec) ?? 0n;
         const val = toBaseUnits(p.valueBase, 6);
-        return { sym: p.symbol || symbolOf(p.token), amount: fmtUnits(amt, dec, dec > 6 ? 6 : 2, 0), value: val != null ? fmtUnits(val, 6, 2) : '—' };
-      })
+        return { sym: p.symbol || symbolOf(p.token), amount: fmtUnits(amt, dec, dec > 6 ? 6 : 2, 0), value: val != null ? fmtUnits(val, 6, 2) : '—', bal: amt };
+      }).filter((r) => r.bal !== 0n)
     : tokens.map((t, i) => {
         const r = reads.data?.[i];
         const bal = r?.status === 'success' ? (r.result as bigint) : 0n;

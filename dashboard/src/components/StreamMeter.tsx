@@ -27,7 +27,7 @@ export function StreamMeter({ meter, ratePerSec, flowing, compact, label = 'Wors
         {!compact && (
           <div className="meter-rate">
             <div className="stat-label">{flowing ? 'Streaming' : 'Not flowing'}</div>
-            <div className="mono">{ratePerHour(ratePerSec)} <span className="muted small">USDT/h</span></div>
+            <div className="figure">{ratePerHour(ratePerSec)} <span className="muted small">USDT/h</span></div>
           </div>
         )}
       </div>
