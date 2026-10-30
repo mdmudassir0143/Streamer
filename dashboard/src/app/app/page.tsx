@@ -2,33 +2,57 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { StreamCard } from '@/components/StreamCard';
+import { NETWORK_NAME, SwitchNetworkButton, useConnectInjected } from '@/components/Nav';
+import { StreamCard, StreamCardSkeleton } from '@/components/StreamCard';
+import { MiniPipe } from '@/components/StreamMeter';
+import { Spinner } from '@/components/ui';
 import { deployment } from '@/lib/deployments';
 import { targetChain } from '@/lib/chains';
 import { useStreamIds } from '@/lib/stream';
 
+function Empty({ title, children, action, art = true }: { title: string; children: React.ReactNode; action?: React.ReactNode; art?: boolean }) {
+  return (
+    <div className="empty">
+      {art && <div className="empty-illustration"><MiniPipe /></div>}
+      <h2 className="h3">{title}</h2>
+      <p>{children}</p>
+      {action}
+    </div>
+  );
+}
+
 function StreamsList() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const { isConnected } = useAccount();
+  const { isConnected, chainId } = useAccount();
+  const { connect, isPending, available } = useConnectInjected();
   const ids = useStreamIds();
-  if (!mounted) return null;
+  const skeletons = <div className="stream-grid"><StreamCardSkeleton /><StreamCardSkeleton /></div>;
+  if (!mounted) return skeletons;
   if (!deployment.vault) {
-    return <div className="notice notice-neg">No StreamVault deployment for chain {targetChain.id}. Deploy the contracts, then restart the dashboard so it picks up deployments/{targetChain.id}.json.</div>;
+    return <Empty title="No vault on this network" art={false}>StreamPilot isn&apos;t deployed on chain {targetChain.id} yet. Deploy the contracts, then restart the dashboard.</Empty>;
   }
   if (!isConnected) {
-    return <div className="empty"><b>Connect your wallet to see your streams</b><span>Streams are read straight from the vault contract.</span></div>;
+    return (
+      <Empty title="Connect your wallet to see your streams"
+        action={<button className="btn btn-primary" disabled={!available || isPending} onClick={connect}>{isPending ? <><Spinner />Connecting</> : 'Connect wallet'}</button>}>
+        Your streams are read straight from the vault contract. Connecting doesn&apos;t move any funds.
+      </Empty>
+    );
   }
-  if (ids.isLoading) return <div className="muted">Reading your streams from chain…</div>;
-  if (ids.error) return <div className="notice notice-neg">Couldn&apos;t read streams from the vault: {ids.error.message.split('\n')[0]}</div>;
+  if (chainId !== targetChain.id) {
+    return <Empty title={`Switch to ${NETWORK_NAME}`} art={false} action={<SwitchNetworkButton />}>Your wallet is on another network. StreamPilot runs on {NETWORK_NAME}.</Empty>;
+  }
+  if (ids.isLoading) return skeletons;
+  if (ids.error) {
+    return <Empty title="Couldn’t read your streams" art={false} action={<button className="btn" onClick={() => ids.refetch()}>Try again</button>}>The network didn&apos;t answer. Check your connection and try again.</Empty>;
+  }
   const list = [...(ids.data ?? [])].reverse();
   if (list.length === 0) {
     return (
-      <div className="empty">
-        <b>No streams yet</b>
-        <span>Start with a small hourly rate. Nothing leaves your wallet until it streams.</span>
-        <Link href="/app/new" className="btn btn-primary">Start a stream</Link>
-      </div>
+      <Empty title="No streams yet" action={<Link href="/app/new" className="btn btn-primary">Start a stream</Link>}>
+        Start with a small hourly rate. Nothing leaves your wallet until it streams.
+      </Empty>
     );
   }
   return <div className="stream-grid">{list.map((id) => <StreamCard key={id.toString()} id={id} />)}</div>;
@@ -38,9 +62,9 @@ export default function AppHome() {
   return (
     <>
       <div className="page-head">
-        <div>
+        <div className="stack-2">
           <h1 className="page-title">Your streams</h1>
-          <p className="muted" style={{ margin: '4px 0 0' }}>The highlighted part of each bar is all the agent can reach.</p>
+          <p className="muted">The cobalt part of each pipe is all the agent can reach.</p>
         </div>
         <Link href="/app/new" className="btn btn-primary">Start a stream</Link>
       </div>

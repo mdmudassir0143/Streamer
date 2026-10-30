@@ -4,16 +4,35 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { ChatPanel } from '@/components/ChatPanel';
-import { DecisionsFeed } from '@/components/DecisionsFeed';
+import { DecisionsFeed, FeedSkeleton } from '@/components/DecisionsFeed';
 import { KillSwitch } from '@/components/KillSwitch';
 import { StreamInfo } from '@/components/StreamInfo';
 import { ModeChip, StatusChip } from '@/components/StatusChip';
 import { StreamMeter } from '@/components/StreamMeter';
-import { pnlStr, usePnl } from '@/components/StreamCard';
-import { Stat } from '@/components/ui';
+import { statusReason, usePnl } from '@/components/StreamCard';
+import { Pnl, Skeleton, Stat } from '@/components/ui';
 import { deployment, symbolOf } from '@/lib/deployments';
-import { fmtDuration, fmtUsdt } from '@/lib/format';
+import { fmtDuration, fmtPct, fmtUsdt, ratePerHour } from '@/lib/format';
 import { MODE_AGENT, useLiveMeter, useStream } from '@/lib/stream';
+
+function DetailSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading stream">
+      <div className="page-head"><div className="stack-2"><Skeleton w={60} /><Skeleton w={200} h={34} /><Skeleton w={260} h={22} /></div></div>
+      <div className="detail">
+        <div className="stack">
+          <section className="card card-pad stack">
+            <Skeleton w={160} /><Skeleton w={260} h={50} /><Skeleton h={48} style={{ borderRadius: 999 }} />
+            <div className="spread"><Skeleton w={120} /><Skeleton w={120} /></div>
+          </section>
+          <div className="stats">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="stat stack-2"><Skeleton w="60%" /><Skeleton w="70%" h={22} /></div>)}</div>
+          <FeedSkeleton />
+        </div>
+        <div className="aside only-wide"><div className="aside-panel card-pad stack"><Skeleton w={116} h={116} style={{ borderRadius: '50%' }} /><Skeleton h={40} /><Skeleton h={44} /></div></div>
+      </div>
+    </div>
+  );
+}
 
 export default function StreamDetail() {
   const params = useParams<{ id: string }>();
@@ -27,10 +46,18 @@ export default function StreamDetail() {
   const { pnl, pct, source, agent } = usePnl(id ?? 0n, data);
   const s = data.stream;
 
-  if (id === undefined) return <div className="notice notice-neg">&ldquo;{raw}&rdquo; isn&apos;t a stream id.</div>;
-  if (!deployment.vault) return <div className="notice notice-neg">No vault deployment for this chain.</div>;
-  if (!mounted || data.isLoading) return <p className="muted">Reading stream #{raw} from chain…</p>;
-  if (!s || !live) return <div className="notice notice-neg">Stream #{raw} couldn&apos;t be read. {data.error?.message.split('\n')[0]}</div>;
+  if (id === undefined) return <div className="notice notice-neg">&ldquo;{raw}&rdquo; isn&apos;t a stream number. <Link className="link" href="/app">Back to your streams</Link></div>;
+  if (!deployment.vault) return <div className="notice notice-neg">There&apos;s no vault on this network yet.</div>;
+  if (!mounted || data.isLoading) return <DetailSkeleton />;
+  if (!s || !live) {
+    return (
+      <div className="empty">
+        <h2 className="h3">Stream #{raw} couldn&apos;t be read</h2>
+        <p>It may not exist, or the network didn&apos;t answer.</p>
+        <div className="row"><button className="btn" onClick={data.refetch}>Try again</button><Link className="btn btn-ghost" href="/app">Back to your streams</Link></div>
+      </div>
+    );
+  }
 
   const isOwner = !!address && address.toLowerCase() === s.owner.toLowerCase();
   const isAgentMode = s.mode === MODE_AGENT;
@@ -39,42 +66,44 @@ export default function StreamDetail() {
   const nextHour = flowing ? s.ratePerSec * 3600n : 0n;
   const reachableHour = data.reachable !== undefined && nextHour > data.reachable ? data.reachable : nextHour;
   const elapsed = now - Number(s.startTime);
+  const reason = statusReason(status, s);
+  const controls = { stream: s, allowance: data.allowance, isOwner, onDone: data.refetch };
 
   return (
     <>
       <div className="page-head">
-        <div className="stack" style={{ gap: 10 }}>
-          <Link href="/app" className="small muted">Streams</Link>
+        <div className="stack-2">
+          <Link href="/app" className="crumb">Your streams</Link>
           <h1 className="page-title">Stream #{raw}</h1>
           <div className="row">
             <StatusChip status={status} />
             <ModeChip mode={s.mode} target={symbolOf(s.targetToken)} />
-            <span className="small faint">Running {fmtDuration(elapsed)}{s.endTime > 0n ? `, ends in ${fmtDuration(Number(s.endTime) - now)}` : ', open-ended'}</span>
+            <span className="small muted">Running for {fmtDuration(elapsed)}{s.endTime > 0n ? `, ends in ${fmtDuration(Number(s.endTime) - now)}` : ', open-ended'}</span>
           </div>
         </div>
       </div>
 
-      {status === 'halted' && <div className="notice notice-neg" style={{ marginBottom: 16 }}>The drawdown breaker tripped: equity fell more than {s.risk.maxDrawdownBps / 100}% below its high. Trading is frozen until you resume.</div>}
-      {status === 'starved' && <div className="notice notice-warn" style={{ marginBottom: 16 }}>The vault can&apos;t pull more because your allowance or balance is empty. Nothing new is exposed.</div>}
-
       <div className="detail">
         <div className="stack">
+          {reason && <p className={`reason${reason.tone ? ` ${reason.tone}` : ''}`}>{reason.text}</p>}
           <section className="card card-pad">
             <StreamMeter variant="panel" meter={meter} ratePerSec={s.ratePerSec} flowing={status === 'live'} />
           </section>
+          <div className="only-narrow"><KillSwitch {...controls} variant="bar" /></div>
           <div className="stats">
-            <Stat label="Exposed now" value={fmtUsdt(meter.exposed)} sub="In vault + accrued" />
-            <Stat label="Worst case in 1h" value={fmtUsdt(meter.exposed + reachableHour)} sub={flowing ? 'If you do nothing' : 'Not flowing'} />
-            <Stat label="Equity" value={fmtUsdt(data.equity)} sub="Valued at venue quote" />
-            <Stat label="P&L" value={pnlStr(pnl)} sub={`${pct.toFixed(2)}% ${source === 'agent' ? '(agent)' : '(on-chain)'}`} tone={pnl > 0n ? 'pos' : pnl < 0n ? 'neg' : undefined} />
+            <Stat label="Equity" value={fmtUsdt(data.equity)} sub="Venue value" />
+            <Stat label="P&L" value={<Pnl value={pnl} />} sub={fmtPct(pct, true)} title={source === 'agent' ? 'P&L reported by the agent' : 'P&L computed from chain'} />
             <Stat label="Streamed" value={fmtUsdt(meter.streamed)} sub={s.maxTotal > 0n ? `of ${fmtUsdt(s.maxTotal)} cap` : 'No cap'} />
+            <Stat label="Rate" value={`${ratePerHour(s.ratePerSec)}/h`} sub={flowing ? 'Flowing' : 'Stopped'} />
+            <Stat label="Worst case in 1h" value={fmtUsdt(meter.exposed + reachableHour)} sub={flowing ? 'If unchanged' : 'Not flowing'} />
           </div>
           <StreamInfo stream={s} equity={data.equity} allowance={data.allowance} apiPositions={agent?.positions} />
           {isAgentMode && <DecisionsFeed id={raw} />}
         </div>
         <aside className="aside">
           <div className="aside-panel">
-            <KillSwitch stream={s} allowance={data.allowance} isOwner={isOwner} onDone={data.refetch} />
+            <div className="only-wide"><KillSwitch {...controls} variant="full" /></div>
+            <div className="only-narrow"><KillSwitch {...controls} variant="rate" /></div>
             {isAgentMode && <ChatPanel streamId={raw} owner={s.owner} />}
           </div>
         </aside>

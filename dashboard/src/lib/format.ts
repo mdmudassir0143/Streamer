@@ -4,11 +4,36 @@ export function fmtUnits(v: bigint, decimals: number, maxFrac = 2, minFrac = max
   const n = Number(formatUnits(v, decimals));
   return n.toLocaleString('en-US', { minimumFractionDigits: minFrac, maximumFractionDigits: maxFrac });
 }
-export const fmtUsdt = (v: bigint, frac = 2) => fmtUnits(v, 6, frac);
-/** P&L: show 4 decimals for sub-dollar amounts so small moves are visible. */
-export const fmtPnl = (v: bigint) => fmtUnits(v, 6, (v < 0n ? -v : v) < 1_000_000n ? 4 : 2);
-/** Precise ticker string for the live meter (4 decimals so per-second motion is visible). */
+/*
+ * Number formatting rules (one place, used everywhere):
+ *  - USDT amounts: 2 decimals            fmtUsdt
+ *  - live ticking headline: 4 decimals   fmtTick (only the worst-case headline)
+ *  - P&L: sign + 2 decimals, "<0.01"     fmtPnl  (returns text + exact title)
+ *  - percentages: 2 decimals             fmtPct
+ *  - token amounts: ≤ 6 significant      fmtToken
+ */
+export const fmtUsdt = (v: bigint) => fmtUnits(v, 6, 2);
 export const fmtTick = (v: bigint) => fmtUnits(v, 6, 4);
+
+/** `dust` = rounds to 0.00; shown neutral ("0.00") with the exact signed value in the tooltip. */
+export function fmtPnl(v: bigint): { text: string; title: string; dust: boolean } {
+  const exact = `${v > 0n ? '+' : v < 0n ? '−' : ''}${fmtUnits(v < 0n ? -v : v, 6, 6, 2)} USDT`;
+  const abs = v < 0n ? -v : v;
+  if (abs < 5_000n) return { text: '0.00', title: exact, dust: true };
+  return { text: `${v > 0n ? '+' : '−'}${fmtUnits(abs, 6, 2)}`, title: exact, dust: false };
+}
+
+export function fmtPct(n: number, signed = false): string {
+  if (Math.abs(n) < 0.005) return '0.00%';
+  const s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${signed ? (n > 0 ? '+' : n < 0 ? '−' : '') : n < 0 ? '−' : ''}${s}%`;
+}
+
+export function fmtToken(v: bigint, decimals: number): string {
+  const n = Number(formatUnits(v, decimals));
+  if (n === 0) return '0';
+  return n.toLocaleString('en-US', { maximumSignificantDigits: 6 });
+}
 
 export function ratePerHour(ratePerSec: bigint): string {
   return fmtUnits(ratePerSec * 3600n, 6, 2);
@@ -51,4 +76,9 @@ export function ageShort(ts: number): string {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   return `${Math.floor(s / 86400)}d`;
+}
+
+/** Amount of any token: USDT-like (6 decimals) as 2-decimal money, others at ≤ 6 significant figures. */
+export function fmtAmount(v: bigint, decimals: number): string {
+  return decimals === 6 ? fmtUsdt(v) : fmtToken(v, decimals);
 }

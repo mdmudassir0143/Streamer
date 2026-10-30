@@ -8,10 +8,17 @@ import { deployment } from '@/lib/deployments';
 import { fmtUsdt, ratePerHour } from '@/lib/format';
 import type { StreamView } from '@/lib/stream';
 import { useTx } from './useTx';
+import { Spinner } from './ui';
 
 const HOLD_MS = 1200;
 
-export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: StreamView; allowance?: bigint; isOwner: boolean; onDone: () => void }) {
+interface Props { stream: StreamView; allowance?: bigint; isOwner: boolean; onDone: () => void }
+
+/**
+ * Owner controls. `full` = round hold-to-kill + pause/revoke + set rate (desktop side panel).
+ * `bar` = compact hold-to-kill + pause/revoke (mobile/tablet, under the meter). `rate` = set rate only.
+ */
+export function KillSwitch({ stream, allowance, isOwner, onDone, variant = 'full' }: Props & { variant?: 'full' | 'bar' | 'rate' }) {
   const { writeContractAsync } = useWriteContract();
   const { run, pending } = useTx();
   const vault = deployment.vault!;
@@ -26,7 +33,7 @@ export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: Str
 
   const cancel = async () => {
     await run('Cancel & withdraw', () => writeContractAsync({ address: vault, abi: streamVaultAbi, functionName: 'cancel', args: [id], chainId: targetChain.id }),
-      'Stream cancelled. Every token in the vault went back to your wallet.');
+      'Stream cancelled. Every token went back to your wallet.');
     onDone();
   };
 
@@ -65,13 +72,61 @@ export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: Str
 
   const revoke = () =>
     run('Revoke allowance', () => writeContractAsync({ address: stream.baseToken, abi: erc20Abi, functionName: 'approve', args: [vault, 0n], chainId: targetChain.id }),
-      'Allowance revoked. The vault cannot pull another cent from your wallet.').then(onDone);
+      'Allowance revoked. The vault can’t pull any more USDT.').then(onDone);
+
+  const busy = (label: string, text: string, idle: string) => (pending === label ? <><Spinner />{text}</> : idle);
+
+  const holdButton = (
+    <button
+      className={`kill-btn${holding ? ' holding' : ''}`}
+      style={{ ['--p' as string]: progress }}
+      disabled={disabled}
+      onPointerDown={startHold}
+      onPointerUp={stopHold}
+      onPointerLeave={stopHold}
+      onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !holding) { e.preventDefault(); startHold(); } }}
+      onKeyUp={stopHold}
+      aria-label="Hold to cancel the stream and withdraw everything"
+    >
+      <span className="kill-btn-face">{pending === 'Cancel & withdraw' ? 'Sending…' : <>Hold to<br />kill</>}</span>
+    </button>
+  );
+
+  const actions = (
+    <div className="kill-grid">
+      {stream.paused || stream.halted ? (
+        <button className="btn" disabled={disabled} onClick={() => tx('Resume', 'resume', stream.halted ? 'Resumed. The drawdown breaker is reset.' : 'Resumed. The stream is flowing again.')}>
+          {busy('Resume', 'Resuming', stream.halted ? 'Reset & resume' : 'Resume')}
+        </button>
+      ) : (
+        <button className="btn" disabled={disabled} onClick={() => tx('Pause', 'pause', 'Paused. Nothing more streams until you resume.')}>{busy('Pause', 'Pausing', 'Pause')}</button>
+      )}
+      <button className="btn" disabled={disabled || allowance === 0n} onClick={revoke}>
+        {allowance === 0n ? 'Revoked' : busy('Revoke allowance', 'Revoking', 'Revoke')}
+      </button>
+    </div>
+  );
+
+  const rateRow = (
+    <div className="input-row">
+      <div className="input-suffix">
+        <input className="input" inputMode="decimal" placeholder={ratePerHour(stream.ratePerSec)} value={newRate} onChange={(e) => setNewRate(e.target.value)} aria-label="New rate in USDT per hour" />
+        <span>USDT/h</span>
+      </div>
+      <button className="btn" style={{ height: 44 }} disabled={disabled || !newRate.trim()} onClick={setRate}>{busy('Set rate', 'Saving', 'Set rate')}</button>
+    </div>
+  );
+
+  const ownerNote = !isOwner && <p className="small strong">Connect the owner wallet to use these controls.</p>;
 
   if (stream.cancelled) {
+    if (variant === 'rate') return null;
     return (
-      <section className="kill" aria-label="Kill switch">
-        <div className="kill-done">Stream cancelled</div>
-        <p className="small muted" style={{ margin: 0 }}>Everything this stream held went back to your wallet. The agent has nothing left to trade.</p>
+      <section className={variant === 'bar' ? 'control-bar' : 'kill'} aria-label="Kill switch" style={variant === 'bar' ? { gridTemplateColumns: '1fr' } : undefined}>
+        <div className="stack-2">
+          <div className="kill-done">Stream cancelled</div>
+          <p className="small muted">Everything this stream held went back to your wallet. The agent has nothing left to trade.</p>
+        </div>
         {allowance !== undefined && allowance > 0n && (
           <button className="btn btn-block" disabled={disabled} onClick={revoke}>Revoke remaining {fmtUsdt(allowance)} USDT allowance</button>
         )}
@@ -79,44 +134,40 @@ export function KillSwitch({ stream, allowance, isOwner, onDone }: { stream: Str
     );
   }
 
+  if (variant === 'bar') {
+    return (
+      <section className="control-bar" aria-label="Kill switch">
+        {holdButton}
+        <div className="control-bar-actions">
+          <div className="small"><span className="strong">Kill switch.</span> <span className="muted">Hold to cancel and get every token back.</span></div>
+          {actions}
+          {ownerNote}
+        </div>
+      </section>
+    );
+  }
+
+  if (variant === 'rate') {
+    return (
+      <section className="kill" aria-label="Change rate">
+        <h2 className="h4">Change rate</h2>
+        {rateRow}
+      </section>
+    );
+  }
+
   return (
     <section className="kill" aria-label="Kill switch">
       <div className="kill-main">
-        <button
-          className={`kill-btn${holding ? ' holding' : ''}`}
-          style={{ ['--p' as string]: progress }}
-          disabled={disabled}
-          onPointerDown={startHold}
-          onPointerUp={stopHold}
-          onPointerLeave={stopHold}
-          onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !holding) { e.preventDefault(); startHold(); } }}
-          onKeyUp={stopHold}
-          aria-label="Hold to cancel the stream and withdraw everything"
-        >
-          <span className="kill-btn-face">{pending === 'Cancel & withdraw' ? 'Sending…' : <>Hold to<br />kill</>}</span>
-        </button>
+        {holdButton}
         <div className="kill-copy">
           <h2 className="h4">Kill switch</h2>
-          <p>Hold the button to cancel. Every token the stream holds goes back to you in one transaction, and pulling stops.</p>
-          {!isOwner && <p className="strong">Connect the owner wallet to use these controls.</p>}
+          <p>Hold to cancel. Every token the stream holds comes back to you in one transaction, and pulling stops.</p>
         </div>
       </div>
-      <div className="kill-grid">
-        {stream.paused || stream.halted ? (
-          <button className="btn" disabled={disabled} onClick={() => tx('Resume', 'resume', stream.halted ? 'Resumed. Drawdown breaker reset.' : 'Resumed. The stream is flowing again.')}>
-            {stream.halted ? 'Reset & resume' : 'Resume stream'}
-          </button>
-        ) : (
-          <button className="btn" disabled={disabled} onClick={() => tx('Pause', 'pause', 'Paused. Nothing more will stream until you resume.')}>Pause stream</button>
-        )}
-        <button className="btn" disabled={disabled || allowance === 0n} onClick={revoke}>
-          {allowance === 0n ? 'Allowance revoked' : 'Revoke allowance'}
-        </button>
-      </div>
-      <div className="input-row">
-        <input className="input" inputMode="decimal" placeholder={`${ratePerHour(stream.ratePerSec)} USDT/h`} value={newRate} onChange={(e) => setNewRate(e.target.value)} aria-label="New rate in USDT per hour" />
-        <button className="btn" style={{ height: 44 }} disabled={disabled || !newRate.trim()} onClick={setRate}>Set rate</button>
-      </div>
+      {actions}
+      {rateRow}
+      {ownerNote}
     </section>
   );
 }

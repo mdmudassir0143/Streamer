@@ -7,44 +7,50 @@ import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError, typ
 import { targetChain, explorerTx } from '@/lib/chains';
 import { useToast } from './Toast';
 
+/** Every contract error as a plain sentence with what to do next. */
 const FRIENDLY: Record<string, string> = {
-  NotOwner: 'Only the stream owner can do that. Switch to the owner wallet.',
-  NotAgent: 'Only the stream agent can trade.',
-  NotAdmin: 'Only the vault admin can do that.',
-  NoStream: 'That stream does not exist.',
-  InvalidParams: 'The contract rejected these settings. Check the rate, agent and risk limits (they must be above zero).',
-  WrongMode: 'This action is not available in this stream mode.',
-  StreamPaused: 'The stream is paused. Resume it first.',
-  StreamHalted: 'The drawdown breaker has halted this stream. Resume to reset it.',
-  StreamCancelled: 'This stream is already cancelled.',
-  TokenNotAllowed: 'That token is not allowed by the vault.',
-  Cooldown: 'The trade cooldown has not elapsed yet.',
-  TradeTooLarge: 'The trade is larger than the risk limit allows.',
-  SlippageTooLoose: 'The minimum output breaks the slippage limit.',
-  InsufficientBalance: 'Not enough balance for this.',
-  InsufficientAllowance: 'The USDT allowance is too low. Approve a higher cap.',
-  Reentrancy: 'Blocked by the reentrancy guard.',
-  FaucetCooldown: 'The faucet works once per hour per wallet. Try again later.',
-  TransferFailed: 'A token transfer failed.',
-  ApproveFailed: 'A token approval failed.',
+  NotOwner: 'Only the stream owner can do this. Switch to the wallet that created the stream.',
+  NotAgent: 'Only the stream’s agent can trade. Check the agent address on the stream.',
+  NotAdmin: 'Only the vault admin can change this setting.',
+  NoStream: 'This stream doesn’t exist. Check the stream number and try again.',
+  InvalidParams: 'The contract rejected these settings. Make sure the rate is above zero and the asset differs from USDT.',
+  WrongMode: 'This action isn’t available for this kind of stream.',
+  StreamPaused: 'The stream is paused. Resume it, then try again.',
+  StreamHalted: 'The drawdown breaker halted this stream. Resume it to reset the breaker.',
+  StreamCancelled: 'This stream is already cancelled. Start a new one to keep streaming.',
+  TokenNotAllowed: 'The vault doesn’t accept that token. Pick WETH, WBTC or WHSK.',
+  Cooldown: 'The trade cooldown hasn’t finished. Wait a moment and try again.',
+  TradeTooLarge: 'The trade is bigger than the risk limit allows. Use a smaller amount.',
+  SlippageTooLoose: 'The minimum output is below the slippage limit. Tighten it and try again.',
+  InsufficientBalance: 'There isn’t enough balance for this. Top up your wallet and try again.',
+  InsufficientAllowance: 'The USDT allowance is too low. Approve a higher cap, then try again.',
+  Reentrancy: 'The vault blocked a nested call. Try again in a moment.',
+  FaucetCooldown: 'The faucet gives each wallet test USDT once an hour. Try again later.',
+  TransferFailed: 'A token transfer failed. Check your balance and allowance, then retry.',
+  ApproveFailed: 'The token approval failed. Try approving again.',
 };
 
-function errMsg(e: unknown): string {
+export function errMsg(e: unknown): string {
   if (e instanceof BaseError) {
     const rev = e.walk((x) => x instanceof ContractFunctionRevertedError);
     if (rev instanceof ContractFunctionRevertedError) {
       const name = rev.data?.errorName;
       if (name && FRIENDLY[name]) return FRIENDLY[name];
-      if (name) return `Reverted with ${name}`;
+      if (name) return `The contract reverted (${name}). Check the stream state and try again.`;
     }
-    if (e.walk((x) => x instanceof UserRejectedRequestError)) return 'You rejected the request in your wallet.';
-    return e.shortMessage.split('\n')[0];
+    if (e.walk((x) => x instanceof UserRejectedRequestError)) return 'You declined the request in your wallet. Nothing was sent.';
+    const m = e.shortMessage.split('\n')[0];
+    if (/insufficient funds/i.test(m)) return 'Your wallet doesn’t have enough HSK for gas. Top it up and try again.';
+    return `${m.replace(/\.$/, '')}. Try again in a moment.`;
   }
   const any = e as { message?: string };
-  return (any?.message || 'Transaction failed').split('\n')[0];
+  return `${(any?.message || 'The transaction failed').split('\n')[0].replace(/\.$/, '')}. Try again in a moment.`;
 }
 
-/** Wraps a wallet call: ensures the right chain, waits for the receipt, toasts, refreshes reads. */
+export type Phase = 'idle' | 'wallet' | 'confirming' | 'done' | 'error';
+export interface TxState { phase: Phase; error?: string; hash?: string }
+
+/** Wraps a wallet call: switches chain, tracks phases per label, waits for the receipt, toasts, refreshes reads. */
 export function useTx() {
   const config = useConfig();
   const { chainId } = useAccount();
@@ -52,25 +58,32 @@ export function useTx() {
   const qc = useQueryClient();
   const toast = useToast();
   const [pending, setPending] = useState<string | null>(null);
+  const [states, setStates] = useState<Record<string, TxState>>({});
+  const set = (label: string, st: TxState) => setStates((s) => ({ ...s, [label]: st }));
 
   async function run(label: string, send: () => Promise<Hash>, doneLabel?: string): Promise<TransactionReceipt | null> {
     setPending(label);
+    set(label, { phase: 'wallet' });
     try {
       if (chainId !== targetChain.id) await switchChainAsync({ chainId: targetChain.id });
       const hash = await send();
-      toast('info', <>{label}: submitted. Waiting for confirmation…</>);
+      set(label, { phase: 'confirming', hash });
       const receipt = await waitForTransactionReceipt(config, { hash, chainId: targetChain.id });
+      if (receipt.status !== 'success') throw new Error(`${label} reverted on-chain`);
       const link = explorerTx(hash);
-      if (receipt.status !== 'success') throw new Error(`${label} reverted`);
-      toast('ok', <>{doneLabel ?? `${label}: confirmed`}{link ? <>. <a href={link} target="_blank" rel="noreferrer">view tx</a></> : null}</>);
+      set(label, { phase: 'done', hash });
+      toast('ok', doneLabel ?? `${label} confirmed`, link ? <a href={link} target="_blank" rel="noreferrer">View transaction</a> : undefined);
       await qc.invalidateQueries();
       return receipt;
     } catch (e) {
-      toast('err', <>{label}: {errMsg(e)}</>);
+      const m = errMsg(e);
+      set(label, { phase: 'error', error: m });
+      toast('err', `${label} didn’t go through`, m);
       return null;
     } finally {
       setPending(null);
     }
   }
-  return { run, pending };
+  const state = (label: string): TxState => states[label] ?? { phase: 'idle' };
+  return { run, pending, state };
 }

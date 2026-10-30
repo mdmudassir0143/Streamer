@@ -13,6 +13,19 @@ interface Props {
 }
 
 /** The flow pipe: in your wallet → agent can trade (liquid) → back to you. Ticks every second. */
+/** Static mini pipe for illustrations (no numbers). */
+export function MiniPipe({ parts = [55, 30, 15] }: { parts?: [number, number, number] }) {
+  return (
+    <div className="pipe-wrap pipe-mini" aria-hidden>
+      <div className="pipe">
+        <div className="pipe-seg wallet" style={{ flexGrow: parts[0] }} />
+        <div className="pipe-seg exposed" style={{ flexGrow: parts[1] }} />
+        <div className="pipe-seg back" style={{ flexGrow: parts[2] }} />
+      </div>
+    </div>
+  );
+}
+
 export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', label = 'Worst-case loss right now' }: Props) {
   const { unstreamed, exposed, returned, openEnded } = meter;
   const total = unstreamed + exposed + returned;
@@ -22,7 +35,7 @@ export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', lab
 
   const segs = [
     { k: 'wallet', name: 'In your wallet', val: walletVal, v: unstreamed, note: openEnded ? 'Bounded by your allowance' : 'Not streamed yet' },
-    { k: 'exposed', name: 'Agent can trade', val: variant === 'thin' ? fmtUsdt(exposed) : fmtTick(exposed), v: exposed, note: `+${fmtTick(ratePerSec)} USDT each second` },
+    { k: 'exposed', name: 'Agent can trade', val: variant === 'thin' ? fmtUsdt(exposed) : variant === 'panel' ? '' : fmtTick(exposed), v: exposed, note: `+${fmtTick(ratePerSec)} USDT each second` },
     { k: 'back', name: 'Back to you', val: fmtUsdt(returned), v: returned, note: 'Withdrawn or cancelled' },
   ];
   // Label cells follow the segment proportions; empty segments keep a small share so all three labels stay.
@@ -38,26 +51,32 @@ export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', lab
 
   if (variant === 'thin') {
     return (
-      <div className="pipe-wrap thin">
+      <div className="pipe-wrap pipe-thin">
         <div>
           <div className="worst-label">{label}</div>
           <div className="worst-figure"><Num>{fmtTick(exposed)}</Num><span className="unit">USDT</span></div>
         </div>
         {pipe}
-        <div className="thin-legend">
-          {segs.map((s) => (
-            <div key={s.k}>
-              <div className="pipe-name"><span className={`sw ${s.k}`} />{s.k === 'wallet' ? 'Wallet' : s.k === 'exposed' ? 'Exposed' : 'Back'}</div>
-              <div className="pipe-val"><Num>{s.k === 'exposed' ? fmtUsdt(exposed) : s.val}</Num></div>
-            </div>
-          ))}
+        <div className="grid-3">
+          <div>
+            <div className="pipe-name"><span className="sw wallet" />Wallet</div>
+            <div className="pipe-val"><Num>{walletVal}</Num></div>
+          </div>
+          <div>
+            <div className="pipe-name"><span className="sw exposed" />Flowing in</div>
+            <div className="pipe-val"><Num>{`${ratePerHour(ratePerSec)}/h`}</Num></div>
+          </div>
+          <div>
+            <div className="pipe-name"><span className="sw back" />Back to you</div>
+            <div className="pipe-val"><Num>{fmtUsdt(returned)}</Num></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`pipe-wrap ${variant}`}>
+    <div className={`pipe-wrap pipe-${variant}`}>
       <div className="pipe-top">
         <div>
           <div className="worst-label">{label}</div>
@@ -69,14 +88,14 @@ export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', lab
         </div>
       </div>
       <div className="pipe-row vals" aria-hidden>
-        {segs.map((s) => <div key={s.k} className="pipe-cell pipe-val" style={{ flexGrow: cellGrow(s.v) }}><span><Num>{s.val}</Num></span></div>)}
+        {segs.map((s) => <div key={s.k} className="pipe-cell pipe-val" style={{ flexGrow: cellGrow(s.v) }}>{s.val && <span><Num>{s.val}</Num></span>}</div>)}
       </div>
       {pipe}
       <div className="pipe-row">
         {segs.map((s) => (
           <div key={s.k} className="pipe-cell" style={{ flexGrow: cellGrow(s.v) }}>
             <span className="pipe-name"><span className={`sw ${s.k}`} />{s.name}</span>
-            <span className="pipe-val-inline"><Num>{s.val}</Num></span>
+            {s.val && <span className="pipe-val-inline"><Num>{s.val}</Num></span>}
             {variant === 'hero' && <span className="pipe-note">{s.note}</span>}
           </div>
         ))}

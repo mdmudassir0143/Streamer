@@ -5,11 +5,11 @@ import { agentApi, useAgentOnline, type ChatResponse } from '@/lib/agentApi';
 import { targetChain } from '@/lib/chains';
 import { useToast } from './Toast';
 import { useTx } from './useTx';
-import { Badge } from './ui';
+import { Badge, Spinner } from './ui';
 
 const PROMPTS = ["What's my P&L?", 'Slow the stream to 2 USDT/hour', 'Only trade ETH, low risk', 'Pause everything'];
 
-interface Msg { who: 'me' | 'agent' | 'err'; text: string; txs?: ChatResponse['txs'] }
+interface Msg { who: 'me' | 'agent' | 'err'; text: string; txs?: ChatResponse['txs']; retry?: string }
 
 export function ChatPanel({ streamId, owner }: { streamId: string; owner: string }) {
   const { online } = useAgentOnline();
@@ -26,9 +26,9 @@ export function ChatPanel({ streamId, owner }: { streamId: string; owner: string
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [log, busy]);
 
-  async function send(message: string) {
+  async function send(message: string, isRetry = false) {
     if (!message.trim() || busy) return;
-    setLog((l) => [...l, { who: 'me', text: message }]);
+    setLog((l) => (isRetry ? l.filter((m) => m.retry !== message) : [...l, { who: 'me', text: message }]));
     setInput('');
     setBusy(true);
     try {
@@ -36,50 +36,59 @@ export function ChatPanel({ streamId, owner }: { streamId: string; owner: string
       setLog((l) => [...l, { who: 'agent', text: r.reply, txs: r.txs }]);
       if (r.prefsUpdated) {
         const p = r.prefsUpdated;
-        toast('ok', <>Agent preferences updated: {p.riskAppetite} risk{p.assets?.length ? `, ${p.assets.join('/')}` : ''}{p.enabled === false ? ', trading off' : ''}</>);
+        toast('ok', 'Agent preferences updated', `${p.riskAppetite} risk${p.assets?.length ? `, ${p.assets.join(', ')} only` : ''}${p.enabled === false ? ', trading paused' : ''}.`);
       }
     } catch (e) {
-      setLog((l) => [...l, { who: 'err', text: `The agent didn't answer (${(e as Error).message || 'offline'}). On-chain controls still work.` }]);
+      const why = (e as Error).name === 'AbortError' ? 'The agent took too long to answer.' : 'The agent didn’t answer.';
+      setLog((l) => [...l, { who: 'err', text: `${why} Your on-chain controls still work.`, retry: message }]);
     } finally {
       setBusy(false);
     }
   }
 
+  const empty = log.length === 0;
+
   return (
     <section className="chat" aria-label="Agent chat">
       <div className="chat-head">
         <h2 className="h4">Ask your agent</h2>
-        {!online && <Badge tone="warn" dot>Offline</Badge>}
+        {!online && <Badge dot>Offline</Badge>}
       </div>
       <div className="chat-log" ref={scroller} aria-live="polite">
-        {log.length === 0 && (
-          <p className="small muted" style={{ margin: 0 }}>
-            {online ? 'Ask about performance or change how it trades. Anything that touches the contract comes back as a transaction for you to sign.' : 'Chat needs the agent API. The kill switch works without it.'}
-          </p>
+        {empty && (
+          <div className="chat-intro">
+            <p>{online ? 'Ask how the stream is doing, or tell the agent how to trade. Anything that changes the contract comes back as a transaction for you to sign.' : 'Chat needs the agent, which is offline. The kill switch works without it.'}</p>
+            <div className="prompt-list">
+              {PROMPTS.map((p) => <button key={p} className="prompt-full" disabled={busy || !online} onClick={() => send(p)}>{p}</button>)}
+            </div>
+          </div>
         )}
         {log.map((m, i) => (
           <div key={i} className={`msg msg-${m.who}`}>
             {m.text}
+            {m.retry && <div><button className="btn btn-sm" disabled={busy || !online} onClick={() => send(m.retry!, true)}>Retry</button></div>}
             {m.txs?.map((t, j) => (
               <div key={j} className="msg-tx">
                 <span>{t.description}</span>
                 <button className="btn btn-primary btn-sm" disabled={!!pending}
                   onClick={() => run(t.description || 'Agent-proposed transaction', () => sendTransactionAsync({ to: t.to, data: t.data, value: BigInt(t.value || '0'), chainId: targetChain.id }))}>
-                  Sign
+                  {pending === (t.description || 'Agent-proposed transaction') ? <><Spinner />Signing</> : 'Sign'}
                 </button>
               </div>
             ))}
           </div>
         ))}
-        {busy && <div className="msg msg-agent faint">Thinking…</div>}
+        {busy && <div className="msg msg-agent" aria-label="Agent is typing"><span className="typing"><span /><span /><span /></span></div>}
       </div>
       <div className="chat-foot">
-        <div className="prompts">
-          {PROMPTS.map((p) => <button key={p} className="prompt" disabled={busy || !online} onClick={() => send(p)}>{p}</button>)}
-        </div>
-        <form className="input-row" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
-          <input className="input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Message your agent" disabled={!online} aria-label="Message" />
-          <button className="btn btn-primary" style={{ height: 40 }} disabled={busy || !online || !input.trim()}>Send</button>
+        {!empty && (
+          <div className="prompts">
+            {PROMPTS.map((p) => <button key={p} className="prompt" disabled={busy || !online} onClick={() => send(p)}>{p}</button>)}
+          </div>
+        )}
+        <form className="chat-form" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
+          <input className="input" value={input} onChange={(e) => setInput(e.target.value)} placeholder={online ? 'Message your agent' : 'Agent offline'} disabled={!online} aria-label="Message" />
+          <button className="btn btn-primary" style={{ height: 44 }} disabled={busy || !online || !input.trim()}>{busy ? <><Spinner />Sending</> : 'Send'}</button>
         </form>
       </div>
     </section>

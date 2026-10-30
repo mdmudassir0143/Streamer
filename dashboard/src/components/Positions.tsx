@@ -5,8 +5,8 @@ import { streamVaultAbi } from '@/lib/abi';
 import type { Position } from '@/lib/agentApi';
 import { targetChain } from '@/lib/chains';
 import { decimalsOf, deployment, symbolOf } from '@/lib/deployments';
-import { fmtUnits, toBaseUnits } from '@/lib/format';
-import { Num } from './ui';
+import { fmtAmount, fmtUsdt, toBaseUnits } from '@/lib/format';
+import { Num, Skeleton } from './ui';
 
 export function Positions({ id, apiPositions }: { id: bigint; apiPositions?: Position[] }) {
   const tokens = Object.values(deployment.tokens).filter(Boolean) as Address[];
@@ -22,23 +22,26 @@ export function Positions({ id, apiPositions }: { id: bigint; apiPositions?: Pos
         const dec = p.decimals ?? decimalsOf(p.symbol || p.token);
         const amt = toBaseUnits(p.amount, dec) ?? 0n;
         const val = toBaseUnits(p.valueBase, 6);
-        return { sym: p.symbol || symbolOf(p.token), amount: fmtUnits(amt, dec, dec > 6 ? 6 : 2, 0), value: val != null ? fmtUnits(val, 6, 2) : '—', bal: amt };
+        return { sym: p.symbol || symbolOf(p.token), amount: fmtAmount(amt, dec), value: val != null ? fmtUsdt(val) : '—', bal: amt };
       }).filter((r) => r.bal !== 0n)
     : tokens.map((t, i) => {
         const r = reads.data?.[i];
         const bal = r?.status === 'success' ? (r.result as bigint) : 0n;
         const dec = decimalsOf(t);
-        return { sym: symbolOf(t), amount: fmtUnits(bal, dec, dec > 6 ? 6 : 2, 0), value: symbolOf(t) === 'USDT' ? fmtUnits(bal, 6, 2) : '—', bal };
+        return { sym: symbolOf(t), amount: fmtAmount(bal, dec), value: symbolOf(t) === 'USDT' ? fmtUsdt(bal) : '—', bal };
       }).filter((r) => (r as { bal?: bigint }).bal !== 0n);
 
-  if (rows.length === 0) return <p className="muted" style={{ margin: 0 }}>The vault holds nothing for this stream right now.</p>;
+  if (!apiPositions && reads.isLoading) {
+    return <div className="stack-2" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="spread" style={{ height: 44 }}><Skeleton w={60} /><Skeleton w={90} /></div>)}</div>;
+  }
+  if (rows.length === 0) return <p className="muted">The vault holds nothing for this stream yet. Balances appear as USDT streams in.</p>;
   return (
     <>
       <table className="table">
         <thead><tr><th>Asset</th><th className="r">Amount</th><th className="r">Value (USDT)</th></tr></thead>
         <tbody>{rows.map((r) => <tr key={r.sym}><td>{r.sym}</td><td className="r num"><Num>{r.amount}</Num></td><td className="r num"><Num>{r.value}</Num></td></tr>)}</tbody>
       </table>
-      {!apiPositions && <p className="small faint" style={{ margin: '10px 0 0' }}>Read from the vault. Non-USDT values appear when the agent is online.</p>}
+      {!apiPositions && <p className="small faint" style={{ marginTop: 'var(--s-3)' }}>Read from the vault. Non-USDT values appear when the agent is online.</p>}
     </>
   );
 }

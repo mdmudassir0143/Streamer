@@ -4,10 +4,10 @@ import { Badge, type Tone } from './ui';
 const MAP: Record<Status, { label: string; tone: Tone }> = {
   live: { label: 'Live', tone: 'accent' },
   paused: { label: 'Paused', tone: 'neutral' },
-  halted: { label: 'Halted by drawdown breaker', tone: 'neg' },
+  halted: { label: 'Halted', tone: 'neg' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },
   ended: { label: 'Ended', tone: 'neutral' },
-  starved: { label: 'Starved: no allowance or balance', tone: 'warn' },
+  starved: { label: 'Starved', tone: 'warn' },
 };
 export function StatusChip({ status }: { status: Status }) {
   const m = MAP[status];

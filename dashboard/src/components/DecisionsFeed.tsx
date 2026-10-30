@@ -3,8 +3,8 @@ import { Fragment, useMemo, useState } from 'react';
 import { useDecisions, type Decision } from '@/lib/agentApi';
 import { explorerTx } from '@/lib/chains';
 import { decimalsOf, symbolOf } from '@/lib/deployments';
-import { ageShort, fmtUnits } from '@/lib/format';
-import { Badge, ExternalIcon, Num, Tabs, type Tone } from './ui';
+import { ageShort, fmtAmount } from '@/lib/format';
+import { Badge, ExternalIcon, Num, Skeleton, Tabs, type Tone } from './ui';
 
 type Kind = 'trade' | 'veto' | 'hold' | 'failed';
 type Filter = 'all' | 'trade' | 'veto' | 'hold';
@@ -38,7 +38,7 @@ function shortReason(d: Decision, kind: Kind): string {
 function pairOf(d: Decision): string {
   if (!d.tokenIn || !d.tokenOut) return '—';
   const s = String(d.amountIn ?? '');
-  const amt = /^\d+$/.test(s) ? fmtUnits(BigInt(s), decimalsOf(d.tokenIn), 2, 0) : s;
+  const amt = /^\d+$/.test(s) ? fmtAmount(BigInt(s), decimalsOf(d.tokenIn)) : s;
   return `${amt} ${symbolOf(d.tokenIn)} → ${symbolOf(d.tokenOut)}`;
 }
 
@@ -119,6 +119,22 @@ function Detail({ g }: { g: Group }) {
   );
 }
 
+function SkeletonRows() {
+  return <>{Array.from({ length: 6 }, (_, i) => (
+    <div key={i} className="skel-row" aria-hidden><Skeleton w={36} /><Skeleton w={64} h={22} style={{ borderRadius: 999 }} /><Skeleton w="70%" /><Skeleton w="50%" /></div>
+  ))}</>;
+}
+
+export function FeedSkeleton() {
+  return (
+    <section className="card feed-card" aria-busy="true" aria-label="Loading decisions">
+      <div className="card-head"><Skeleton w={140} h={16} /></div>
+      <div className="feed-tools"><Skeleton w={280} h={36} /></div>
+      <div className="feed-scroll"><SkeletonRows /></div>
+    </section>
+  );
+}
+
 export function DecisionsFeed({ id }: { id: string }) {
   const { data, isLoading, isError, isSuccess } = useDecisions(id);
   const [filter, setFilter] = useState<Filter>('all');
@@ -162,11 +178,13 @@ export function DecisionsFeed({ id }: { id: string }) {
         />
       </div>
       <div className="feed-scroll">
-        {isLoading && <p className="muted" style={{ padding: 16, margin: 0 }}>Loading decisions…</p>}
-        {(isError || (!isLoading && !data)) && (
-          <p className="muted" style={{ padding: 16, margin: 0 }}>Decisions appear when the agent API is reachable. On-chain controls keep working.</p>
+        {isLoading && <SkeletonRows />}
+        {!isLoading && (isError || !data) && (
+          <p className="feed-empty">The agent is offline, so decisions can&apos;t load. Your on-chain controls still work.</p>
         )}
-        {data && groups.length === 0 && <p className="muted" style={{ padding: 16, margin: 0 }}>Nothing here yet. The agent reviews the market every tick once funds have streamed in.</p>}
+        {data && groups.length === 0 && (
+          <p className="feed-empty">{filter === 'all' ? 'No decisions yet. The agent reviews the market every minute once USDT has streamed in.' : `No ${filter === 'trade' ? 'trades' : filter === 'veto' ? 'vetoes' : 'holds'} yet.`}</p>
+        )}
         {groups.slice(0, shown).map((g) => {
           const newest = tsOf(g.items[0]);
           const oldest = tsOf(g.items[g.items.length - 1]);

@@ -2,11 +2,11 @@
 import Link from 'next/link';
 import { useAgentStream } from '@/lib/agentApi';
 import { symbolOf } from '@/lib/deployments';
-import { fmtPnl, fmtUsdt, ratePerHour, toBaseUnits } from '@/lib/format';
-import { useLiveMeter, useStream } from '@/lib/stream';
+import { fmtUsdt, toBaseUnits } from '@/lib/format';
+import { useLiveMeter, useStream, type Status, type StreamView } from '@/lib/stream';
 import { StreamMeter } from './StreamMeter';
 import { ModeChip, StatusChip } from './StatusChip';
-import { Stat } from './ui';
+import { Pnl, Skeleton, Stat } from './ui';
 
 export function usePnl(id: bigint, data: ReturnType<typeof useStream>) {
   const agent = useAgentStream(id.toString());
@@ -19,18 +19,34 @@ export function usePnl(id: bigint, data: ReturnType<typeof useStream>) {
   return { pnl, pct, source: apiPnl != null ? 'agent' : 'chain', agent: agent.data };
 }
 
-export const pnlStr = (pnl: bigint) => `${pnl >= 0n ? '+' : ''}${fmtPnl(pnl)}`;
+/** Plain-language reason for a stream that isn't flowing normally. */
+export function statusReason(status: Status, s: StreamView): { text: string; tone?: 'neg' } | null {
+  if (status === 'halted') return { text: `Halted: equity fell more than ${s.risk.maxDrawdownBps / 100}% below its high. Resume to reset the breaker.`, tone: 'neg' };
+  if (status === 'starved') return { text: 'Starved: the vault can’t pull more because your allowance or USDT balance is empty.' };
+  return null;
+}
+
+export function StreamCardSkeleton() {
+  return (
+    <div className="card stream-card" aria-busy="true" aria-label="Loading stream">
+      <div className="spread"><Skeleton w={140} h={18} /><Skeleton w={56} h={22} /></div>
+      <div className="stack-2"><Skeleton w={110} /><Skeleton w={180} h={34} /></div>
+      <Skeleton h={14} style={{ borderRadius: 999 }} />
+      <div className="grid-3">{[0, 1, 2].map((i) => <div key={i} className="stack-2"><Skeleton w="70%" /><Skeleton w="50%" h={16} /></div>)}</div>
+      <div className="grid-3 stream-card-stats">{[0, 1, 2].map((i) => <div key={i} className="stack-2"><Skeleton w="60%" /><Skeleton w="45%" h={16} /></div>)}</div>
+    </div>
+  );
+}
 
 export function StreamCard({ id }: { id: bigint }) {
   const data = useStream(id);
   const live = useLiveMeter(data);
   const { pnl, pct } = usePnl(id, data);
   const s = data.stream;
-  if (!s || !live) {
-    return <div className="card stream-card"><span className="h4">Stream #{id.toString()}</span><span className="muted">Reading from chain…</span></div>;
-  }
+  if (!s || !live) return <StreamCardSkeleton />;
+  const reason = statusReason(live.status, s);
   return (
-    <Link href={`/app/stream/${id.toString()}`} className="card stream-card">
+    <Link href={`/app/stream/${id.toString()}`} className="card stream-card" aria-label={`Stream ${id.toString()}, ${live.status}`}>
       <div className="spread">
         <div className="row">
           <span className="h4">Stream #{id.toString()}</span>
@@ -38,11 +54,12 @@ export function StreamCard({ id }: { id: bigint }) {
         </div>
         <StatusChip status={live.status} />
       </div>
+      {reason && <p className={`reason${reason.tone ? ` ${reason.tone}` : ''}`}>{reason.text}</p>}
       <StreamMeter variant="thin" meter={live.meter} ratePerSec={s.ratePerSec} flowing={live.status === 'live'} label="Worst-case loss" />
-      <div className="stream-card-stats">
-        <Stat label="Rate" value={`${ratePerHour(s.ratePerSec)}/h`} />
+      <div className="grid-3 stream-card-stats">
         <Stat label="Equity" value={fmtUsdt(data.equity)} />
-        <Stat label="P&L" value={pnlStr(pnl)} sub={`${pct.toFixed(2)}%`} tone={pnl > 0n ? 'pos' : pnl < 0n ? 'neg' : undefined} />
+        <Stat label="P&L" value={<Pnl value={pnl} />} sub={`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}%`} />
+        <Stat label="Streamed" value={fmtUsdt(live.meter.streamed)} sub={s.maxTotal > 0n ? `of ${fmtUsdt(s.maxTotal)}` : 'No cap'} />
       </div>
     </Link>
   );
