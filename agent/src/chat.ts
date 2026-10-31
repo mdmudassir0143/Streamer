@@ -258,7 +258,7 @@ async function llmChat(st: StreamState, message: string): Promise<ChatResponse> 
     prefs: getPrefs(id.toString()),
     chainId: config.chainId,
   };
-  const system = `You are StreamPilot, the AI trading agent operating a user's payment stream on HashKey Chain. The user streams ${base.symbol} to a vault at a fixed rate; you may only trade what has been streamed so far. Pausing/cancelling the stream is their kill switch.
+  const system = `You are Hashtream, the AI trading agent operating a user's payment stream on HashKey Chain. The user streams ${base.symbol} to a vault at a fixed rate; you may only trade what has been streamed so far. Pausing/cancelling the stream is their kill switch.
 Answer briefly and concretely. Use tools to read live data rather than guessing. Agent-side preferences (risk appetite, assets, frequency, position size, enabled) you change directly with update_prefs. On-chain changes (rate, pause, resume, cancel, on-chain risk limits, target, withdraw) must go through propose_onchain; tell the user they need to sign the prepared transaction in the dashboard. Never claim an on-chain change already happened.
 Stream context: ${JSON.stringify(context, jsonReplacer)}`;
 

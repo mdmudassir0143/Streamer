@@ -1,4 +1,4 @@
-# StreamPilot agent
+# Hashtream agent
 
 This is the Node 22 + TypeScript runtime that runs the multi-agent trading pipeline, the INVEST keeper, the testnet price-sync keeper and the HTTP API the dashboard reads. The contract and API contract live in `../docs/SPEC.md`.
 
@@ -35,7 +35,7 @@ Optional tuning variables:
 |---|---|---|
 | `DEFAULT_INTERVAL_SEC` | 60 | Default tick interval per stream (overridable via prefs) |
 | `PRICE_SYNC_SEC` | 30 | Interval of the price-sync keeper |
-| `MIN_TRADE_BASE` | 0.5 (1 on mainnet) | Minimum trade size, so gas isn't wasted |
+| `MIN_TRADE_BASE` | 0.5 (0.05 on mainnet) | Minimum trade size, so gas isn't wasted |
 | `INVEST_MIN_BASE` | 1 | Base amount that triggers `invest` |
 | `INVEST_MAX_IDLE_SEC` | 300 | Also triggers `invest` after this long with any balance |
 | `ANALYST_MODEL` | claude-sonnet-5-5 | Model for the analyst and risk calls |

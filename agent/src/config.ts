@@ -136,7 +136,7 @@ export function loadConfig() {
     priceSyncSec: intEnv("PRICE_SYNC_SEC", 30),
     investMinBase: process.env.INVEST_MIN_BASE ?? "1", // human base units (e.g. 1 USDT)
     investMaxIdleSec: intEnv("INVEST_MAX_IDLE_SEC", 300),
-    minTradeBase: process.env.MIN_TRADE_BASE ?? (chainId === 177 ? "1" : "0.5"),
+    minTradeBase: process.env.MIN_TRADE_BASE ?? (chainId === 177 ? "0.05" : "0.5"),
     logChunk: BigInt(intEnv("LOG_CHUNK", 9000)),
   };
 }
