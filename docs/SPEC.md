@@ -1,4 +1,4 @@
-# StreamPilot — shared spec (source of truth for contracts, agent, dashboard)
+# Hashtream — shared spec (source of truth for contracts, agent, dashboard)
 
 **Pitch:** An AI trading agent on HashKey Chain that can only ever touch the capital you have *streamed* to it so far.
 Exposure = rate × elapsed time, not your whole deposit. Pause/cancel the stream (or revoke the USDT allowance) = kill switch.
