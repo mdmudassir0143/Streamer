@@ -26,7 +26,7 @@ export function MiniPipe({ parts = [55, 30, 15] }: { parts?: [number, number, nu
   );
 }
 
-export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', label = 'Worst-case loss right now' }: Props) {
+export function StreamMeter({ meter, ratePerSec, flowing, variant = 'panel', label = 'Your agent can use right now' }: Props) {
   const { unstreamed, exposed, returned, openEnded } = meter;
   const total = unstreamed + exposed + returned;
   const share = (v: bigint) => (total === 0n ? 0 : Number((v * 100000n) / total) / 1000);

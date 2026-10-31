@@ -55,7 +55,7 @@ export function StreamCard({ id }: { id: bigint }) {
         <StatusChip status={live.status} />
       </div>
       {reason && <p className={`reason${reason.tone ? ` ${reason.tone}` : ''}`}>{reason.text}</p>}
-      <StreamMeter variant="thin" meter={live.meter} ratePerSec={s.ratePerSec} flowing={live.status === 'live'} label="Worst-case loss" />
+      <StreamMeter variant="thin" meter={live.meter} ratePerSec={s.ratePerSec} flowing={live.status === 'live'} label="Agent can use" />
       <div className="grid-3 stream-card-stats">
         <Stat label="Equity" value={fmtUsdt(data.equity)} />
         <Stat label="P&L" value={<Pnl value={pnl} />} sub={`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}%`} />

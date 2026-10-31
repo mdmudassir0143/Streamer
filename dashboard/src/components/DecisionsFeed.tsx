@@ -107,7 +107,7 @@ function Detail({ g }: { g: Group }) {
       {d.error && <div><h5>Error</h5><p className="neg">{d.error}</p></div>}
       <div className="spread">
         <div>
-          <h5>Decision hash committed on-chain</h5>
+          <h5>{d.txHash ? 'Decision hash committed on-chain' : 'Decision hash (not committed: no trade sent)'}</h5>
           <div className="hash">{d.reasonHash ?? '—'}</div>
         </div>
         <div className="row">

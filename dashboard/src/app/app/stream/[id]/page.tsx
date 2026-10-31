@@ -63,9 +63,16 @@ export default function StreamDetail() {
   const isAgentMode = s.mode === MODE_AGENT;
   const { meter, status, now } = live;
   const flowing = status === 'live' || status === 'halted';
-  const nextHour = flowing ? s.ratePerSec * 3600n : 0n;
+  // Next hour of flow, bounded by the stream's end time and its maxTotal cap.
+  const secsLeft = s.endTime > 0n ? Math.max(0, Math.min(3600, Number(s.endTime) - now)) : 3600;
+  let nextHour = flowing ? s.ratePerSec * BigInt(secsLeft) : 0n;
+  const capLeft = s.maxTotal > 0n ? (s.maxTotal > meter.streamed ? s.maxTotal - meter.streamed : 0n) : undefined;
+  if (capLeft !== undefined && nextHour > capLeft) nextHour = capLeft;
   const reachableHour = data.reachable !== undefined && nextHour > data.reachable ? data.reachable : nextHour;
   const elapsed = now - Number(s.startTime);
+  // The cap can end a stream before its endTime.
+  const capEnd = capLeft !== undefined && s.ratePerSec > 0n ? now + Number(capLeft / s.ratePerSec) : undefined;
+  const endsAt = s.endTime > 0n ? Math.min(Number(s.endTime), capEnd ?? Infinity) : capEnd;
   const reason = statusReason(status, s);
   const controls = { stream: s, allowance: data.allowance, isOwner, onDone: data.refetch };
 
@@ -78,7 +85,7 @@ export default function StreamDetail() {
           <div className="row">
             <StatusChip status={status} />
             <ModeChip mode={s.mode} target={symbolOf(s.targetToken)} />
-            <span className="small muted">Running for {fmtDuration(elapsed)}{s.endTime > 0n ? `, ends in ${fmtDuration(Number(s.endTime) - now)}` : ', open-ended'}</span>
+            <span className="small muted">Running for {fmtDuration(elapsed)}{status === 'cancelled' || status === 'ended' ? '' : endsAt !== undefined ? `, ends in ${fmtDuration(Math.max(0, endsAt - now))}${capEnd !== undefined && endsAt === capEnd ? ', when the cap is reached' : ''}` : ', open-ended'}</span>
           </div>
         </div>
       </div>
@@ -95,7 +102,7 @@ export default function StreamDetail() {
             <Stat label="P&L" value={<Pnl value={pnl} />} sub={fmtPct(pct, true)} title={source === 'agent' ? 'P&L reported by the agent' : 'P&L computed from chain'} />
             <Stat label="Streamed" value={fmtUsdt(meter.streamed)} sub={s.maxTotal > 0n ? `of ${fmtUsdt(s.maxTotal)} cap` : 'No cap'} />
             <Stat label="Rate" value={`${ratePerHour(s.ratePerSec)}/h`} sub={flowing ? 'Flowing' : 'Stopped'} />
-            <Stat label="Worst case in 1h" value={fmtUsdt(meter.exposed + reachableHour)} sub={flowing ? 'If unchanged' : 'Not flowing'} />
+            <Stat label="Agent can use in 1h" value={fmtUsdt(meter.exposed + reachableHour)} sub={flowing ? 'If unchanged' : 'Not flowing'} />
           </div>
           <StreamInfo stream={s} equity={data.equity} allowance={data.allowance} apiPositions={agent?.positions} />
           {isAgentMode && <DecisionsFeed id={raw} />}

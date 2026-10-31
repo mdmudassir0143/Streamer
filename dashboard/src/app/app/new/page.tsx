@@ -14,6 +14,8 @@ import { Num, Spinner } from '@/components/ui';
 import { StreamMeter } from '@/components/StreamMeter';
 
 type Unit = 'hour' | 'day';
+type DurUnit = 'min' | Unit;
+const DUR_SECS: Record<DurUnit, number> = { min: 60, hour: 3600, day: 86400 };
 const PRESET_COPY: Record<RiskPreset, string> = {
   Conservative: 'Small, careful trades.',
   Balanced: 'Moderate size and pace.',
@@ -38,7 +40,7 @@ export default function NewStream() {
   const [unit, setUnit] = useState<Unit>('hour');
   const [openEnded, setOpenEnded] = useState(false);
   const [duration, setDuration] = useState('24');
-  const [durUnit, setDurUnit] = useState<Unit>('hour');
+  const [durUnit, setDurUnit] = useState<DurUnit>('hour');
   const [maxTotal, setMaxTotal] = useState('');
   const [preset, setPreset] = useState<RiskPreset>('Balanced');
   const [cap, setCap] = useState('');
@@ -50,7 +52,7 @@ export default function NewStream() {
 
   const rateBase = safeParse(rate);
   const ratePerSec = rateBase / (unit === 'hour' ? 3600n : 86400n);
-  const durationSec = openEnded ? 0n : BigInt(Math.max(0, Math.floor(Number(duration || '0') * (durUnit === 'hour' ? 3600 : 86400))));
+  const durationSec = openEnded ? 0n : BigInt(Math.max(0, Math.floor(Number(duration || '0') * DUR_SECS[durUnit])));
   const plannedTotal = durationSec > 0n ? ratePerSec * durationSec : 0n;
   const maxTotalBase = maxTotal.trim() ? safeParse(maxTotal) : plannedTotal;
   const capBase = capTouched ? safeParse(cap) : maxTotalBase;
@@ -167,13 +169,13 @@ export default function NewStream() {
                 <div className="agent-line">
                   {isAddress(agent) ? (
                     <>
-                      <span>{isDefaultAgent ? 'StreamPilot agent' : 'Custom agent'}</span>
+                      <span>{isDefaultAgent ? 'Hashtream agent' : 'Custom agent'}</span>
                       <span className="muted">·</span>
                       <span className="mono">{shortAddr(agent)}</span>
                       {isDefaultAgent && <span className="ok-mark" aria-label="verified">✓</span>}
                     </>
                   ) : (
-                    <span className="muted">{agentLoading ? 'Looking up the StreamPilot agent…' : 'The agent is offline. Add its address under Advanced.'}</span>
+                    <span className="muted">{agentLoading ? 'Looking up the Hashtream agent…' : 'The agent is offline. Add its address under Advanced.'}</span>
                   )}
                 </div>
               )}
@@ -200,6 +202,7 @@ export default function NewStream() {
                 <div className="input-row">
                   <input id="duration" className="input" inputMode="decimal" value={openEnded ? '' : duration} disabled={openEnded} onChange={(e) => setDuration(e.target.value)} placeholder={openEnded ? 'Open-ended' : ''} />
                   <div className="segmented" role="group" aria-label="Duration unit">
+                    <button type="button" aria-pressed={!openEnded && durUnit === 'min'} onClick={() => { setOpenEnded(false); setDurUnit('min'); }}>Mins</button>
                     <button type="button" aria-pressed={!openEnded && durUnit === 'hour'} onClick={() => { setOpenEnded(false); setDurUnit('hour'); }}>Hours</button>
                     <button type="button" aria-pressed={!openEnded && durUnit === 'day'} onClick={() => { setOpenEnded(false); setDurUnit('day'); }}>Days</button>
                     <button type="button" aria-pressed={openEnded} onClick={() => setOpenEnded(true)}>Open-ended</button>
@@ -299,11 +302,11 @@ export default function NewStream() {
 
         <aside className="aside">
           <div className="aside-panel card-pad stack">
-            <StreamMeter variant="thin" meter={preview} ratePerSec={ratePerSec} flowing label="Worst case after one hour" />
+            <StreamMeter variant="thin" meter={preview} ratePerSec={ratePerSec} flowing label="Agent can use after one hour" />
             <dl className="kv">
               <dt>Per hour</dt><dd>{fmtUsdt(ratePerSec * 3600n)} USDT</dd>
               <dt>Budget cap</dt><dd>{maxTotalBase > 0n ? `${fmtUsdt(maxTotalBase)} USDT` : 'Allowance only'}</dd>
-              <dt>Fully streamed in</dt><dd>{hours != null ? (hours >= 48 ? `${(hours / 24).toFixed(1)} days` : `${hours.toFixed(1)} hours`) : 'Open-ended'}</dd>
+              <dt>Fully streamed in</dt><dd>{hours != null ? (hours >= 48 ? `${(hours / 24).toFixed(1)} days` : hours < 1 ? `${Math.round(hours * 60)} min` : `${hours.toFixed(1)} hours`) : 'Open-ended'}</dd>
               <dt>Wallet balance</dt><dd>{balance !== undefined ? `${fmtUsdt(balance)} USDT` : '—'}</dd>
             </dl>
           </div>
