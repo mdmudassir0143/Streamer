@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { fmtPct, fmtPnl } from '@/lib/format';
 
 export type Tone = 'neutral' | 'accent' | 'pos' | 'neg' | 'warn';
@@ -80,10 +81,11 @@ export function Pnl({ value, pct }: { value: bigint; pct?: number }) {
 }
 
 /** Dropdown menu: button + popover, closes on outside click and Escape, focuses first item on open. */
-export function Menu({ label, buttonClass = 'btn btn-sm', children }: { label: ReactNode; buttonClass?: string; children: (close: () => void) => ReactNode }) {
+export function Menu({ label, buttonClass = 'btn btn-sm', popClass, ariaLabel, children }: { label: ReactNode; buttonClass?: string; popClass?: string; ariaLabel?: string; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
+  const reduce = useReducedMotion();
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
@@ -95,8 +97,17 @@ export function Menu({ label, buttonClass = 'btn btn-sm', children }: { label: R
   }, [open]);
   return (
     <div className="menu" ref={ref}>
-      <button className={buttonClass} aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>{label}</button>
-      {open && <div className="menu-pop" role="menu" id={id}>{children(() => setOpen(false))}</div>}
+      <button className={buttonClass} aria-label={ariaLabel} aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>{label}</button>
+      <AnimatePresence>
+        {open && (
+          <motion.div className={`menu-pop${popClass ? ` ${popClass}` : ''}`} role="menu" id={id}
+            initial={reduce ? false : { opacity: 0, y: -6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }} transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
+            style={{ transformOrigin: 'top right' }}>
+            {children(() => setOpen(false))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -111,9 +122,13 @@ export function ExternalIcon() {
 
 export function BrandMark() {
   return (
-    <svg className="brand-mark" viewBox="0 0 26 14" aria-hidden>
-      <rect width="26" height="14" rx="7" fill="#e9edff" />
-      <rect x="2" y="2" width="13" height="10" rx="5" fill="#2b4bff" />
+    <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden>
+      <rect width="32" height="32" rx="9" fill="#B6F36B" />
+      <g transform="translate(6 6.5) scale(0.833)" fill="none" stroke="#0B1206" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+        <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+        <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+      </g>
     </svg>
   );
 }

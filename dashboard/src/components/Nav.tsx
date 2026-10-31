@@ -3,20 +3,54 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useSwitchChain, useWriteContract } from 'wagmi';
-import { targetChain, isTestnetTarget, explorerAddress } from '@/lib/chains';
+import { targetChain, isTestnetTarget, explorerAddress, networkName } from '@/lib/chains';
 import { deployment } from '@/lib/deployments';
 import { erc20Abi } from '@/lib/abi';
 import { useAgentOnline } from '@/lib/agentApi';
 import { shortAddr } from '@/lib/format';
 import { useTx } from './useTx';
 import { useToast } from './Toast';
+import { useNetwork } from './Providers';
+import { ThemeToggle } from './ThemeToggle';
 import { Badge, BrandMark, Menu, Spinner } from './ui';
 
 export const GITHUB = 'https://github.com/mdmudassir0143/Streamer';
-export const NETWORK_NAME = targetChain.id === 177 ? 'HashKey Chain' : targetChain.id === 133 ? 'HSK Testnet' : 'Local anvil';
-
 export function NetworkBadge() {
-  return <Badge dot>{NETWORK_NAME}</Badge>;
+  useNetwork(); // re-render on switch
+  return <Badge dot>{networkName()}</Badge>;
+}
+
+const NETWORK_NOTE: Record<number, string> = { 177: 'Mainnet · real funds', 133: 'Testnet · free test USDT', 31337: 'Local anvil node' };
+
+function Chevron() {
+  return <svg className="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+/** Testnet ⇄ mainnet picker; falls back to a plain badge when only one network is deployed. */
+export function NetworkSwitch() {
+  const { chainId, options, select } = useNetwork();
+  if (options.length < 2) return <NetworkBadge />;
+  return (
+    <Menu buttonClass="badge net-trigger" popClass="net-pop" ariaLabel={`Network: ${networkName(chainId)}. Change network`}
+      label={<><span className={`dot${chainId === 177 ? ' dot-main' : ' dot-test'}`} aria-hidden />{networkName(chainId)}<Chevron /></>}>
+      {(close) => (
+        <>
+          <div className="menu-head">Choose network</div>
+          {options.map((id) => (
+            <button key={id} role="menuitemradio" aria-checked={id === chainId} className="menu-item net-item"
+              onClick={() => { close(); if (id !== chainId) select(id); }}>
+              <span className={`net-dot${id === 177 ? ' main' : ''}`} aria-hidden />
+              <span className="net-text">
+                <span className="net-name">{networkName(id)}</span>
+                <span className="net-note">{NETWORK_NOTE[id] ?? ''}</span>
+              </span>
+              <span className="net-check" aria-hidden>{id === chainId ? '✓' : ''}</span>
+            </button>
+          ))}
+        </>
+      )}
+    </Menu>
+  );
 }
 
 function AgentBadge() {
@@ -74,7 +108,7 @@ export function SwitchNetworkButton({ className = 'btn btn-primary' }: { classNa
   const { switchChain, isPending } = useSwitchChain();
   return (
     <button className={className} disabled={isPending} onClick={() => switchChain({ chainId: targetChain.id })}>
-      {isPending ? <><Spinner />Switching</> : `Switch to ${NETWORK_NAME}`}
+      {isPending ? <><Spinner />Switching</> : `Switch to ${networkName()}`}
     </button>
   );
 }
@@ -103,7 +137,7 @@ function Connect() {
         <Menu label={<span className="mono">{shortAddr(address)}</span>}>
           {(close) => (
             <>
-              <div className="menu-head">Connected to {NETWORK_NAME}</div>
+              <div className="menu-head">Connected to {networkName()}</div>
               <button role="menuitem" className="menu-item" onClick={() => { close(); void copy(); }}>Copy address</button>
               {link && <a role="menuitem" className="menu-item" href={link} target="_blank" rel="noreferrer" onClick={close}>View on explorer</a>}
               <div className="menu-sep" />
@@ -128,15 +162,16 @@ export function AppNav() {
   return (
     <header className="nav">
       <div className="container nav-inner">
-        <Link href="/" className="brand" aria-label="StreamPilot home"><BrandMark />StreamPilot</Link>
+        <Link href="/" className="brand" aria-label="Hashtream home"><BrandMark />Hashtream</Link>
         <nav className="nav-links" aria-label="App">
           <Link href="/app" aria-current={streams}>Streams</Link>
           <Link href="/app/new" aria-current={create}>New stream</Link>
         </nav>
         <div className="nav-right">
-          <span className="nav-hide-md"><NetworkBadge /></span>
+          <NetworkSwitch />
           <AgentBadge />
           <FaucetButton />
+          <ThemeToggle />
           <Connect />
         </div>
       </div>
@@ -152,14 +187,16 @@ export function LandingNav() {
   return (
     <header className="nav">
       <div className="container nav-inner">
-        <Link href="/" className="brand" aria-label="StreamPilot home"><BrandMark />StreamPilot</Link>
+        <Link href="/" className="brand" aria-label="Hashtream home"><BrandMark />Hashtream</Link>
         <nav className="nav-links" aria-label="Sections">
+          <a href="#safe">Stay safe</a>
           <a href="#how">How it works</a>
           <a href="#safety">Safety</a>
           <a href={GITHUB} target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <div className="nav-right">
           <span className="nav-hide-sm"><NetworkBadge /></span>
+          <ThemeToggle />
           <Link href="/app" className="btn btn-primary btn-sm">Launch app</Link>
         </div>
       </div>
