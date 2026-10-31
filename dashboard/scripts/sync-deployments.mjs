@@ -10,6 +10,13 @@ const depDir = path.resolve(root, '..', 'deployments');
 const outDir = path.resolve(root, 'src', 'generated');
 fs.mkdirSync(outDir, { recursive: true });
 
+// Hosted builds (e.g. Vercel with Root Directory = dashboard) may not see ../deployments.
+// Keep the committed src/generated files then, instead of overwriting them with empty stubs.
+if (!fs.existsSync(depDir) && fs.existsSync(path.join(outDir, 'deployments.json'))) {
+  console.log('[sync] ../deployments not found; keeping committed src/generated');
+  process.exit(0);
+}
+
 const chains = [31337, 133, 177];
 const all = {};
 for (const id of chains) {
