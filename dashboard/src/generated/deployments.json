@@ -18,6 +18,25 @@
     "vault": "0xe9F69870DC2299f3Da98Abe4ecD00505fF1BA40d",
     "venue": "0x9188f021E4FbBd00c018D7C1EEC1120eC91b0Ed5"
   },
+  "177": {
+    "chainId": 177,
+    "decimals": {
+      "USDT": 6,
+      "WBTC": 8,
+      "WETH": 18,
+      "WHSK": 18
+    },
+    "deployer": "0x1e4dd57bAcB144B1fA42D43513750665F2D62e53",
+    "startBlock": 29568120,
+    "tokens": {
+      "USDT": "0xF1B50eD67A9e2CC94Ad3c477779E2d4cBfFf9029",
+      "WBTC": "0x6119CA49a79f5825C8B345F8d7aC36B272565b14",
+      "WETH": "0xefd4bC9afD210517803f293ABABd701CaeeCdfd0",
+      "WHSK": "0xB210D2120d57b758EE163cFfb43e73728c471Cf1"
+    },
+    "vault": "0x51f10B56585d45396ff277280B47640B2247E5a8",
+    "venue": "0x610070Ee46461FEd78FD4be520D894Ef07866a56"
+  },
   "31337": {
     "chainId": 31337,
     "decimals": {
