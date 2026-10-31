@@ -2,12 +2,12 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { NETWORK_NAME, SwitchNetworkButton, useConnectInjected } from '@/components/Nav';
+import { SwitchNetworkButton, useConnectInjected } from '@/components/Nav';
 import { StreamCard, StreamCardSkeleton } from '@/components/StreamCard';
 import { MiniPipe } from '@/components/StreamMeter';
 import { Spinner } from '@/components/ui';
 import { deployment } from '@/lib/deployments';
-import { targetChain } from '@/lib/chains';
+import { networkName, targetChain } from '@/lib/chains';
 import { useStreamIds } from '@/lib/stream';
 
 function Empty({ title, children, action, art = true }: { title: string; children: React.ReactNode; action?: React.ReactNode; art?: boolean }) {
@@ -30,7 +30,7 @@ function StreamsList() {
   const skeletons = <div className="stream-grid"><StreamCardSkeleton /><StreamCardSkeleton /></div>;
   if (!mounted) return skeletons;
   if (!deployment.vault) {
-    return <Empty title="No vault on this network" art={false}>StreamPilot isn&apos;t deployed on chain {targetChain.id} yet. Deploy the contracts, then restart the dashboard.</Empty>;
+    return <Empty title="No vault on this network" art={false}>Hashtream isn&apos;t deployed on chain {targetChain.id} yet. Deploy the contracts, then restart the dashboard.</Empty>;
   }
   if (!isConnected) {
     return (
@@ -41,7 +41,7 @@ function StreamsList() {
     );
   }
   if (chainId !== targetChain.id) {
-    return <Empty title={`Switch to ${NETWORK_NAME}`} art={false} action={<SwitchNetworkButton />}>Your wallet is on another network. StreamPilot runs on {NETWORK_NAME}.</Empty>;
+    return <Empty title={`Switch to ${networkName()}`} art={false} action={<SwitchNetworkButton />}>Your wallet is on another network. Hashtream runs on {networkName()}.</Empty>;
   }
   if (ids.isLoading) return skeletons;
   if (ids.error) {

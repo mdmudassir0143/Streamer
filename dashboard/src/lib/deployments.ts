@@ -62,7 +62,18 @@ function normalize(chainId: number, j: unknown): Deployment {
 }
 
 const all = raw as Record<string, unknown>;
-export const deployment: Deployment = normalize(targetChain.id, all[String(targetChain.id)] ?? {});
+const load = (id: number) => normalize(id, all[String(id)] ?? {});
+export let deployment: Deployment = load(targetChain.id);
+
+/** Call after setTargetChain so `deployment` follows the selected network. */
+export function refreshDeployment() {
+  deployment = load(targetChain.id);
+}
+
+/** Chain ids that have a vault deployed (what the network switcher offers). */
+export function deployedChainIds(): number[] {
+  return Object.keys(all).map(Number).filter((id) => !!load(id).vault);
+}
 
 export const TOKEN_DECIMALS: Record<string, number> = { USDT: 6, WETH: 18, WBTC: 8, WHSK: 18 };
 export const ASSETS: AssetSymbol[] = ['WETH', 'WBTC', 'WHSK'];

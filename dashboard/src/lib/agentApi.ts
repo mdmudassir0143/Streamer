@@ -1,7 +1,14 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
+import { targetChain } from './chains';
 
-export const AGENT_API = (process.env.NEXT_PUBLIC_AGENT_API || 'http://localhost:8787').replace(/\/$/, '');
+// One agent process per chain. Next only inlines static NEXT_PUBLIC_* references, hence the explicit map.
+const PER_CHAIN: Record<number, string | undefined> = {
+  133: process.env.NEXT_PUBLIC_AGENT_API_133,
+  177: process.env.NEXT_PUBLIC_AGENT_API_177,
+};
+export const agentBase = () =>
+  (PER_CHAIN[targetChain.id] || process.env.NEXT_PUBLIC_AGENT_API || 'http://localhost:8787').replace(/\/$/, '');
 
 export interface Health { ok: boolean; chainId: number; agentAddress: `0x${string}` | null; vault: `0x${string}` | null; engine?: string }
 export interface Prices {
@@ -45,7 +52,7 @@ async function req<T>(path: string, init?: RequestInit, timeoutMs = 6000): Promi
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(`${AGENT_API}${path}`, {
+    const r = await fetch(`${agentBase()}${path}`, {
       ...init,
       signal: ctl.signal,
       headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },

@@ -113,9 +113,10 @@ export function computeMeter(
   return { unstreamed, exposed, returned: withdrawn, streamed, openEnded };
 }
 
-const vault = deployment.vault;
+// Read per render, not at import: the network switcher swaps `deployment` at runtime.
 
 export function useStreamIds() {
+  const vault = deployment.vault;
   const { address } = useAccount();
   return useReadContract({
     address: vault, abi: streamVaultAbi, functionName: 'streamsOf', args: address ? [address] : undefined,
@@ -126,6 +127,7 @@ export function useStreamIds() {
 
 /** Chain state for one stream, reconciled every ~10s; meter values tick client-side each second. */
 export function useStream(id: bigint | undefined) {
+  const vault = deployment.vault;
   const enabled = !!vault && id !== undefined;
   const reads = useReadContracts({
     allowFailure: true,

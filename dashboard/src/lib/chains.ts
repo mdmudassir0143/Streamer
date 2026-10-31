@@ -29,8 +29,20 @@ export const allChains = [hskTestnet, hskMainnet, anvil] as const;
 export type SupportedChainId = (typeof allChains)[number]['id'];
 
 const envId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? '133');
-export const targetChain = allChains.find((c) => c.id === envId) ?? hskTestnet;
-export const isTestnetTarget = targetChain.id !== 177;
+export const defaultChain = allChains.find((c) => c.id === envId) ?? hskTestnet;
+
+// Live bindings: the network switcher (Providers) reassigns these, then remounts the app.
+export let targetChain: (typeof allChains)[number] = defaultChain;
+export let isTestnetTarget = targetChain.id !== 177;
+
+export function setTargetChain(id: number) {
+  targetChain = allChains.find((c) => c.id === id) ?? defaultChain;
+  isTestnetTarget = targetChain.id !== 177;
+}
+
+export function networkName(id: number = targetChain.id): string {
+  return id === 177 ? 'HashKey Chain' : id === 133 ? 'HSK Testnet' : 'Local anvil';
+}
 
 export function explorerTx(hash: string): string | null {
   const url = targetChain.blockExplorers?.default.url;
