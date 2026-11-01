@@ -9,7 +9,7 @@ import { erc20Abi } from '@/lib/abi';
 import { useAgentOnline } from '@/lib/agentApi';
 import { shortAddr } from '@/lib/format';
 import { useTx } from './useTx';
-import { useToast } from './Toast';
+import { useToast, useToastControls } from './Toast';
 import { useNetwork } from './Providers';
 import { ThemeToggle } from './ThemeToggle';
 import { Badge, BrandMark, Menu, Spinner } from './ui';
@@ -29,6 +29,7 @@ function Chevron() {
 /** Testnet ⇄ mainnet picker; falls back to a plain badge when only one network is deployed. */
 export function NetworkSwitch() {
   const { chainId, options, select } = useNetwork();
+  const { push } = useToastControls();
   if (options.length < 2) return <NetworkBadge />;
   return (
     <Menu buttonClass="badge net-trigger" popClass="net-pop" ariaLabel={`Network: ${networkName(chainId)}. Change network`}
@@ -38,7 +39,7 @@ export function NetworkSwitch() {
           <div className="menu-head">Choose network</div>
           {options.map((id) => (
             <button key={id} role="menuitemradio" aria-checked={id === chainId} className="menu-item net-item"
-              onClick={() => { close(); if (id !== chainId) select(id); }}>
+              onClick={() => { close(); if (id !== chainId) { select(id); push({ kind: 'info', title: `Now on ${networkName(id)}`, msg: NETWORK_NOTE[id] }); } }}>
               <span className={`net-dot${id === 177 ? ' main' : ''}`} aria-hidden />
               <span className="net-text">
                 <span className="net-name">{networkName(id)}</span>

@@ -4,8 +4,8 @@ import { useAccount, useConfig, useSwitchChain } from 'wagmi';
 import { waitForTransactionReceipt } from 'wagmi/actions';
 import { useQueryClient } from '@tanstack/react-query';
 import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError, type Hash, type TransactionReceipt } from 'viem';
-import { targetChain, explorerTx } from '@/lib/chains';
-import { useToast } from './Toast';
+import { targetChain, explorerTx, networkName } from '@/lib/chains';
+import { useToastControls } from './Toast';
 
 /** Every contract error as a plain sentence with what to do next. */
 const FRIENDLY: Record<string, string> = {
@@ -56,29 +56,36 @@ export function useTx() {
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const qc = useQueryClient();
-  const toast = useToast();
+  const toasts = useToastControls();
   const [pending, setPending] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, TxState>>({});
   const set = (label: string, st: TxState) => setStates((s) => ({ ...s, [label]: st }));
 
-  async function run(label: string, send: () => Promise<Hash>, doneLabel?: string): Promise<TransactionReceipt | null> {
+  async function run(label: string, send: () => Promise<Hash>, doneLabel?: string, opts?: { onError?: (message: string) => void }): Promise<TransactionReceipt | null> {
     setPending(label);
     set(label, { phase: 'wallet' });
+    // One popup per transaction, updated in place: sign → confirming → done (or failed).
+    const id = toasts.push({ kind: 'pending', step: 1, title: `${label}: waiting for your signature`, msg: 'Approve it in your wallet. Nothing has been sent yet.' });
+    let step: 1 | 2 = 1;
     try {
       if (chainId !== targetChain.id) await switchChainAsync({ chainId: targetChain.id });
       const hash = await send();
+      step = 2;
       set(label, { phase: 'confirming', hash });
+      const link = explorerTx(hash);
+      const view = link ? <a href={link} target="_blank" rel="noreferrer">View transaction</a> : null;
+      toasts.update(id, { step: 2, title: `${label}: confirming`, msg: <>Signed and sent. Waiting for {networkName()} to include it in a block. {view}</> });
       const receipt = await waitForTransactionReceipt(config, { hash, chainId: targetChain.id });
       if (receipt.status !== 'success') throw new Error(`${label} reverted on-chain`);
-      const link = explorerTx(hash);
       set(label, { phase: 'done', hash });
-      toast('ok', doneLabel ?? `${label} confirmed`, link ? <a href={link} target="_blank" rel="noreferrer">View transaction</a> : undefined);
+      toasts.update(id, { kind: 'ok', step: 3, title: doneLabel ?? `${label} confirmed`, msg: <>Confirmed on {networkName()}. {view}</> });
       await qc.invalidateQueries();
       return receipt;
     } catch (e) {
       const m = errMsg(e);
       set(label, { phase: 'error', error: m });
-      toast('err', `${label} didn’t go through`, m);
+      toasts.update(id, { kind: 'err', step, title: `${label} didn’t go through`, msg: m });
+      opts?.onError?.(m);
       return null;
     } finally {
       setPending(null);

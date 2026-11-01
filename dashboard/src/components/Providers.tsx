@@ -1,12 +1,13 @@
 'use client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { WagmiProvider } from 'wagmi';
 import { switchChain } from '@wagmi/core';
 import { wagmiConfig } from '@/lib/wagmi';
 import { defaultChain, setTargetChain } from '@/lib/chains';
 import { deployedChainIds, refreshDeployment } from '@/lib/deployments';
 import { ToastProvider } from './Toast';
+import { WalletActivity } from './WalletActivity';
 
 const STORAGE_KEY = 'streampilot:network';
 
@@ -57,7 +58,11 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={qc}>
         <NetworkContext.Provider value={ctx}>
-          <ToastProvider key={chainId}>{children}</ToastProvider>
+          {/* Toasts sit outside the per-network remount so they survive a network switch. */}
+          <ToastProvider>
+            <WalletActivity />
+            <Fragment key={chainId}>{children}</Fragment>
+          </ToastProvider>
         </NetworkContext.Provider>
       </QueryClientProvider>
     </WagmiProvider>
