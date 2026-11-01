@@ -34,6 +34,10 @@ function DetailSkeleton() {
   );
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  paused: 'Paused', halted: 'Halted by drawdown', cancelled: 'Cancelled', ended: 'Ended', starved: 'Waiting for allowance', live: 'Streaming',
+};
+
 export default function StreamDetail() {
   const params = useParams<{ id: string }>();
   const raw = params?.id ?? '';
@@ -94,7 +98,7 @@ export default function StreamDetail() {
         <div className="stack">
           {reason && <p className={`reason${reason.tone ? ` ${reason.tone}` : ''}`}>{reason.text}</p>}
           <section className="card card-pad">
-            <StreamMeter variant="panel" meter={meter} ratePerSec={s.ratePerSec} flowing={status === 'live'} />
+            <StreamMeter variant="panel" meter={meter} ratePerSec={s.ratePerSec} flowing={status === 'live'} statusLabel={STATUS_LABEL[status]} />
           </section>
           <div className="only-narrow"><KillSwitch {...controls} variant="bar" /></div>
           <div className="stats">
