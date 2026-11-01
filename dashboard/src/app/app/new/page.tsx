@@ -12,6 +12,7 @@ import { MODE_AGENT, MODE_INVEST, RISK_PRESETS, type RiskPreset } from '@/lib/st
 import { useTx, type Phase } from '@/components/useTx';
 import { Num, Spinner } from '@/components/ui';
 import { StreamMeter } from '@/components/StreamMeter';
+import { WalletCard } from '@/components/WalletCard';
 
 type Unit = 'hour' | 'day';
 type DurUnit = 'min' | Unit;
@@ -274,7 +275,7 @@ export default function NewStream() {
                 <div className="notice">Connect your wallet to approve and create the stream.</div>
               ) : (
                 <div className="action-bar">
-                  <ActionStep n="Step 1" title="Approve USDT" phase={approvePhase} error={state('Approve USDT').error} doneText="Approved"
+                  <ActionStep n="Step 1" title="Approve USDT" phase={approvePhase} error={state('Approve USDT').error} doneText={state('Approve USDT').phase === 'done' ? 'Approved on-chain' : 'Already approved: your allowance covers this cap'}
                     hint={`Lets the vault pull up to ${fmtUsdt(capBase)} USDT as it streams.`}>
                     {!approved && (
                       <button className="btn btn-block" disabled={!!pending || capBase === 0n || !vault} onClick={approve}>
@@ -307,9 +308,9 @@ export default function NewStream() {
               <dt>Per hour</dt><dd>{fmtUsdt(ratePerSec * 3600n)} USDT</dd>
               <dt>Budget cap</dt><dd>{maxTotalBase > 0n ? `${fmtUsdt(maxTotalBase)} USDT` : 'Allowance only'}</dd>
               <dt>Fully streamed in</dt><dd>{hours != null ? (hours >= 48 ? `${(hours / 24).toFixed(1)} days` : hours < 1 ? `${Math.round(hours * 60)} min` : `${hours.toFixed(1)} hours`) : 'Open-ended'}</dd>
-              <dt>Wallet balance</dt><dd>{balance !== undefined ? `${fmtUsdt(balance)} USDT` : '—'}</dd>
             </dl>
           </div>
+          <WalletCard usdt={balance} needed={maxTotalBase} />
         </aside>
       </div>
     </>
